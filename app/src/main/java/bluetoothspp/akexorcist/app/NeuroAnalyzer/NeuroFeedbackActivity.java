@@ -46,7 +46,7 @@ import static org.apache.commons.lang3.ArrayUtils.toPrimitive;
 public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
     private final String [] MODELLIST = {"회귀모델(S1,2,3,4)", "회귀모델(S2,3,4)"};
-    private enum SimulationMode {None, Sleep, Wake}                     // 시뮬레이션 모드
+    private enum SimulationMode {None, Sleep, Wake, Reverse}                     // 시뮬레이션 모드
 
     private static ArrayList<Double> sensorData;             // 센서 데이터를 임시로 보관하는 List
     private static ArrayList<Integer> sensorDataCnt;         // 1초에 읽어온 센서 데이터의 갯수를 저장
@@ -179,6 +179,13 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         simMode = SimulationMode.Sleep; break;
                     case R.id.rbtnWakeMode:
                         simMode = SimulationMode.Wake;  break;
+                    case R.id.rbtnReverseFeedback:
+                        simMode = SimulationMode.Reverse;
+
+                        if (soundRunnable != null)
+                            soundRunnable.setVolume(0.0f);
+
+                        break;
                 }
             }
         });
@@ -203,7 +210,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-       switchFileRecording = (Switch)findViewById(R.id.switchFileRecording);
+        switchFileRecording = (Switch)findViewById(R.id.switchFileRecording);
         switchFileRecording.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 optionOfFileWrite = isChecked;
@@ -375,12 +382,13 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                     // 수면 상태 판별
                     ((TextView)findViewById(R.id.tboxSleepStage)).setText(sleepStageClass > 0.5 ? "Wake" : "Sleep");
 
-                    if (simMode == SimulationMode.None)                                  // 시뮬레이션을 하지 않으면 실제 값으로 수면 상태 판별
+                    if (simMode == SimulationMode.None || simMode == SimulationMode.Reverse) {                                  // 시뮬레이션을 하지 않으면 실제 값으로 수면 상태 판별
                         typeOfSleepStage = sleepStageClass > 0.5 ? 0 : 1;
-                    else if (simMode == SimulationMode.Sleep)                           // Sleep 시뮬레이션 모드이면 무조건 Sleep 상태
+                    } else if (simMode == SimulationMode.Sleep) {                           // Sleep 시뮬레이션 모드이면 무조건 Sleep 상태
                         typeOfSleepStage = 1;
-                    else if (simMode == SimulationMode.Wake)                            // Wake 시뮬레이션 모드이면 무조건 Wake 상태
+                    } else if (simMode == SimulationMode.Wake) {                            // Wake 시뮬레이션 모드이면 무조건 Wake 상태
                         typeOfSleepStage = 0;
+                    }
 
                     if (typeOfSleepStage == 0)                                          // 수면 상태에 따라 메인 이미지 바꾸기
                         imgView.setImageDrawable(wakeImg);
@@ -434,9 +442,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
         // 자는 상태이고, 볼륨이 0 이면 피드백을 중단
         if ( typeOfSleepStage == 1 && volumeLevel == 0 ) {
-            txtMonitoring.append("볼륨 피드백이 중단 되었습니다.\n");
-            txtBTStatus.removeCallbacks(soundRunnable);
-
+            if (simMode == SimulationMode.None) {                               // None 피드백일 경우에만 정지
+                txtMonitoring.append("볼륨 피드백이 중단 되었습니다.\n");
+                txtBTStatus.removeCallbacks(soundRunnable);
+            }
         } else {
 
             if (!txtBTStatus.getHandler().hasMessages(0)) {
@@ -448,14 +457,24 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 feedbackEllapsedTime = 0;                               // 경과 시간을 다시 0으로 설정
 
-                if (typeOfSleepStage == 0) {                            // Wake 프로세스이므로 볼륨 키우기
-                    volumeLevel += 0.1;
-                    if (volumeLevel >= 1.0f)
-                        volumeLevel = 1.0f;                              // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
-                } else {                                                  // Sleep 프로세스이므로 볼륨 줄이기
-                    volumeLevel -= 0.1;
-                    if (volumeLevel <= 0.0f)
-                        volumeLevel = 0.0f;                             // 볼륨이 0%보다 낮을 수 없으므로 0.0으로 고정
+                if (simMode == SimulationMode.None) {                   // 자극 -> 졸림 -> 자극 줄이기
+                    if (typeOfSleepStage == 0) {                            // Wake 프로세스이므로 볼륨 키우기
+                        volumeLevel += 0.1;
+                        if (volumeLevel >= 1.0f)
+                            volumeLevel = 1.0f;                              // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
+                    } else {                                                  // Sleep 프로세스이므로 볼륨 줄이기
+                        volumeLevel -= 0.1;
+                        if (volumeLevel <= 0.0f)
+                            volumeLevel = 0.0f;                             // 볼륨이 0%보다 낮을 수 없으므로 0.0으로 고정
+                    }
+                } else if (simMode == SimulationMode.Reverse) {         // 자극 없음 -> 졸림 -> 자극 주기
+                    if (typeOfSleepStage == 0) {                          // Wake 상태에는 피드백 없음
+                        volumeLevel = 0.0f;
+                    } else {                                                  // Sleep 상태에서 바로 피드백 추가
+                        volumeLevel += 0.1;
+                        if (volumeLevel >= 1.0f)
+                            volumeLevel = 1.0f;                              // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
+                    }
                 }
 
                 txtMonitoring.append("현재 볼륨은 " + volumeLevel + "입니다.\n");
