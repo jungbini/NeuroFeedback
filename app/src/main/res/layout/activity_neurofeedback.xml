@@ -1,0 +1,504 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true" >
+
+    <TabHost
+        android:id="@+id/TabHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <TabWidget
+                android:id="@android:id/tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <FrameLayout
+                android:id="@android:id/tabcontent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:id="@+id/tabSetting"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="top"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/select_model"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_alignParentTop="true"
+                        android:layout_weight="1"
+                        android:gravity="top"
+                        android:orientation="horizontal"
+                        android:paddingTop="10dp"
+                        android:visibility="visible">
+
+                        <TextView
+                            android:id="@+id/txtModelSelection"
+                            android:layout_width="60dp"
+                            android:layout_height="40dp"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="수면예측 모델 선택"
+                            android:textAllCaps="false"
+                            android:textSize="15dp" />
+
+                        <Spinner
+                            android:id="@+id/spnModelSelection"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:ems="10"
+                            android:gravity="left"
+                            android:textColor="@android:color/background_dark"
+                            android:textSize="20dp"></Spinner>
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/feedback_method"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:paddingRight="10dp"
+                        android:paddingTop="10dp">
+
+                        <TextView
+                            android:id="@+id/txtFeedback"
+                            android:layout_width="60dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="피드백 방식"
+                            android:textSize="15dp" />
+
+                        <RadioGroup
+                            android:id="@+id/rgroupFeedback"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <RadioButton
+                                android:id="@+id/rbtnSetVolume"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:checked="true"
+                                android:gravity="left|fill_vertical"
+                                android:text="볼륨 줄이기"
+                                android:textSize="15dp" />
+
+                            <RadioButton
+                                android:id="@+id/rbtnSetFrequency"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:gravity="left|fill_vertical"
+                                android:text="빈도 줄이기"
+                                android:textSize="15dp" />
+
+                        </RadioGroup>
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/feedbackVolumeTerm"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:paddingTop="10dp">
+
+                        <TextView
+                            android:id="@+id/txtFeedback_option"
+                            android:layout_width="60dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="피드백 반영 시간"
+                            android:textSize="15dp" />
+
+                        <SeekBar
+                            android:id="@+id/pBarFeedbackChangeTime"
+                            style="@style/Widget.AppCompat.SeekBar.Discrete"
+                            android:layout_width="170dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:max="60"
+                            android:min="5"
+                            android:progress="30" />
+
+                        <EditText
+                            android:id="@+id/tboxFBChangeTerm"
+                            android:layout_width="5dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/rectangletextview"
+                            android:ems="10"
+                            android:focusable="false"
+                            android:gravity="right|center_vertical"
+                            android:inputType="number"
+                            android:text="30"
+                            android:textColor="@android:color/holo_blue_light"
+                            android:textSize="15dp" />
+
+                        <TextView
+                            android:layout_width="5dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="right|center_vertical"
+                            android:paddingRight="10dp"
+                            android:text="초"
+                            android:textSize="15dp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/feedbackSoundSpeed"
+                        android:layout_width="match_parent"
+                        android:layout_height="60dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:paddingTop="10dp">
+
+                        <TextView
+                            android:id="@+id/txtSoundSpeed"
+                            android:layout_width="60dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="물방울 소리 간격"
+                            android:textSize="15dp" />
+
+                        <RadioGroup
+                            android:id="@+id/rgSoundSpeed"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <RadioButton
+                                android:id="@+id/rbtnSet25"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:checked="true"
+                                android:gravity="left|fill_vertical"
+                                android:text="2.5초"
+                                android:textSize="15dp" />
+
+                            <RadioButton
+                                android:id="@+id/rbtnSet50"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:checked="true"
+                                android:gravity="left|fill_vertical"
+                                android:text="5초"
+                                android:textSize="15dp" />
+
+                            <RadioButton
+                                android:id="@+id/rbtnSet75"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:gravity="left|fill_vertical"
+                                android:text="7.5초"
+                                android:textSize="15dp" />
+
+                            <RadioButton
+                                android:id="@+id/rbtnSet100"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:gravity="left|fill_vertical"
+                                android:text="10초"
+                                android:textSize="15dp" />
+
+                        </RadioGroup>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/writeFile"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:paddingTop="10dp">
+
+                        <Switch
+                            android:id="@+id/switchFileRecording"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:checked="false"
+                            android:gravity="center_vertical"
+                            android:paddingLeft="10dp"
+                            android:paddingRight="10dp"
+                            android:text="파일 저장"
+                            android:textSize="15dp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/LayoutSimulation"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:paddingTop="10dp">
+
+                        <TextView
+                            android:id="@+id/txtSimulation"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="피드백 시뮬레이션"
+                            android:textSize="15dp" />
+
+                        <RadioGroup
+                            android:id="@+id/rgSimulation"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:orientation="horizontal">
+
+                            <RadioButton
+                                android:id="@+id/rbtnNoSimulation"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:checked="true"
+                                android:gravity="left|fill_vertical"
+                                android:text="안함"
+                                android:textSize="15dp" />
+
+                            <RadioButton
+                                android:id="@+id/rbtnSleepMode"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:gravity="left|fill_vertical"
+                                android:text="Sleep"
+                                android:textSize="15dp" />
+
+                            <RadioButton
+                                android:id="@+id/rbtnWakeMode"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_weight="1"
+                                android:gravity="left|fill_vertical"
+                                android:text="Wake"
+                                android:textSize="15dp" />
+
+                        </RadioGroup>
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/tabMain"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/txtBluetooth"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:gravity="left|center_vertical"
+                        android:paddingLeft="10dp"
+                        android:text="1. 블루투스 연결"
+                        android:textSize="20dp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutConnect"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnBTConnect"
+                            android:layout_width="200dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="5dp"
+                            android:layout_marginRight="5dp"
+                            android:layout_weight="1"
+                            android:text="연결"
+                            android:textSize="15dp" />
+
+                        <TextView
+                            android:id="@+id/textBTStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:focusable="false"
+                            android:gravity="left|center_vertical"
+                            android:text="연결 상태 : 연결되지 않음"
+                            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                            android:textSize="15dp" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/txtStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="10dp"
+                        android:layout_weight="1"
+                        android:gravity="left|center_vertical"
+                        android:paddingLeft="10dp"
+                        android:text="2. 수면 상태"
+                        android:textSize="20dp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutSleepStage"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="5dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/lblSleepStage"
+                            android:layout_width="60dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="수면 상태"
+                            android:textAllCaps="false"
+                            android:textSize="15dp" />
+
+                        <EditText
+                            android:id="@+id/tboxSleepStage"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/rectangletextview"
+                            android:ems="10"
+                            android:focusable="false"
+                            android:inputType="textPersonName"
+                            android:paddingLeft="10dp"
+                            android:selectAllOnFocus="false"
+                            android:singleLine="false"
+                            android:text="Wake"
+                            android:textAppearance="@style/TextAppearance.AppCompat"
+                            android:textColor="@android:color/holo_blue_light"
+                            android:textSize="15dp"
+                            tools:text="Wake" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/layoutModelValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="5dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/lblModelValue"
+                            android:layout_width="60dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="수면 측정  값(%)"
+                            android:textAllCaps="false"
+                            android:textSize="15dp" />
+
+                        <EditText
+                            android:id="@+id/tboxModelValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/rectangletextview"
+                            android:ems="10"
+                            android:focusable="false"
+                            android:inputType="textPersonName"
+                            android:paddingLeft="10dp"
+                            android:text="0"
+                            android:textColor="@android:color/holo_blue_light"
+                            android:textSize="15dp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/imageView"
+                            android:layout_width="match_parent"
+                            android:layout_height="200dp"
+                            android:layout_gravity="center"
+                            android:layout_marginLeft="10dp"
+                            android:layout_marginRight="10dp"
+                            android:layout_marginTop="10dp"
+                            android:layout_weight="1"
+                            android:background="@color/Darkholo"
+                            android:visibility="visible" />
+
+                    </LinearLayout>
+
+
+                </LinearLayout>
+
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tboxStatus"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentTop="true"
+                android:layout_marginBottom="10dp"
+                android:layout_marginLeft="10dp"
+                android:layout_marginRight="10dp"
+                android:layout_marginTop="10dp"
+                android:layout_weight="1"
+                android:focusable="false"
+                android:gravity="bottom"
+                android:paddingLeft="10dp"
+                android:text="시작 전입니다...\n"
+                android:textColor="@android:color/holo_green_dark"
+                android:textSize="15dp" />
+
+        </LinearLayout>
+    </TabHost>
+
+    <requestFocus />
+
+</RelativeLayout>

@@ -1,0 +1,113 @@
+
+<!--
+ Copyright 2014 Akexorcist
+ 
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ 
+ http://www.apache.org/licenses/LICENSE-2.0
+ 
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true" >
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/chart2"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignTop="@+id/barchart2" />
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/chart1"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_alignEnd="@+id/radioGroup"
+        android:layout_below="@+id/chart2" />
+
+    <com.github.mikephil.charting.charts.BarChart
+        android:id="@+id/barchart2"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/radioGroup"
+        android:layout_marginTop="25dp"
+        android:visibility="invisible" />
+
+    <com.github.mikephil.charting.charts.BarChart
+        android:id="@+id/barchart1"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_alignEnd="@+id/radioGroup"
+        android:layout_below="@+id/chart2"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/textStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/btnBTConnect"
+        android:layout_alignBottom="@+id/btnBTConnect"
+        android:layout_marginStart="17dp"
+        android:layout_toEndOf="@+id/btnBTConnect"
+        android:text="연결 상태 : 연결되지 않음"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textSize="18sp" />
+
+    <requestFocus />
+
+    <Button
+        android:id="@+id/btnBTConnect"
+        style="@android:style/Widget.Holo.Light.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:text="연결"
+        android:textAppearance="@style/TextAppearance.AppCompat.Large"
+        android:textSize="18sp" />
+
+    <RadioGroup
+        android:id="@+id/radioGroup"
+        android:layout_width="660dp"
+
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/btnBTConnect"
+        android:layout_marginLeft="10dp"
+        android:layout_marginTop="20dp"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/rBtnRawData"
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="true"
+            android:text="Raw 데이터" />
+
+        <RadioButton
+            android:id="@+id/rBtnPSGraph"
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="파워스펙트럼" />
+
+        <RadioButton
+            android:id="@+id/rBtnWriteFile"
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="파일로 기록" />
+    </RadioGroup>
+
+</RelativeLayout>

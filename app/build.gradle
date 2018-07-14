@@ -1,0 +1,38 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 26
+    defaultConfig {
+        applicationId "bluetoothspp.akexorcist.app.bluetoothspp"
+        minSdkVersion 21
+        targetSdkVersion 21
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    productFlavors {
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.android.support:appcompat-v7:26.1.0'
+    implementation 'com.android.support:design:26.1.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.0'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'com.android.support.test:runner:1.0.1'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
+    // 블루투스 SPP 통신 라이브러리
+    compile 'com.akexorcist:bluetoothspp:1.0.0'
+    // MPAndroidChart 차트 라이브러리
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.0.3'
+    // FFT 알고리즘
+    implementation files('libs/JTransforms-3.1-with-dependencies.jar')
+    implementation files('libs/commons-lang3-3.7.jar')
+}
