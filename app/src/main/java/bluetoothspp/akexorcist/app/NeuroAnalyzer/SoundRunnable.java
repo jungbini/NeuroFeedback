@@ -1,6 +1,7 @@
 package bluetoothspp.akexorcist.app.NeuroAnalyzer;
 
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.view.View;
 
@@ -16,7 +17,7 @@ public final class SoundRunnable implements Runnable {
 
     public SoundRunnable(@NonNull View view, float volume, long interval) {
         this.view = view;
-        mediaPlyaer = MediaPlayer.create(this.view.getContext(), R.raw.waterdrop);
+        mediaPlyaer = MediaPlayer.create(this.view.getContext(), R.raw.waterdrop2);
         mediaPlyaer.setVolume(volume, volume);
         this.interval = interval;
     }

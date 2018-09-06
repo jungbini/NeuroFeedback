@@ -14,7 +14,6 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -23,11 +22,13 @@ import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.jtransforms.fft.DoubleFFT_1D;
 
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.locks.ReentrantLock;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.BluetoothConnectionListener;
@@ -38,9 +39,9 @@ import bluetoothspp.akexorcist.app.DataProcessing.DataReadingThread;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.LinearRegressionModel;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.RegressionModel;
 
-import static org.apache.commons.lang3.ArrayUtils.toPrimitive;
-
 public class NeuroFeedbackActivity extends Activity implements OnClickListener {
+
+    private final ReentrantLock lock = new ReentrantLock();         // 쓰레드 lock을 위한 Util 클래스
 
     private double elapsedSecond = 0;                               // 경과된 초
     private double gradient = 0;                                     // 회귀식 기울기
@@ -48,10 +49,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private ArrayList<Double> yAlphaThetaArray;                      // Alpha / Theta 비율 값을 저장할 배열
 
     private final String [] MODEL_LIST = {"회귀모델(S1,2,3,4)", "회귀모델(S2,3,4)"};
+    private final String [] SOUND_LIST = {"물방울 소리1", "물방울 소리2", "물방울 소리3"};
     private enum SimulationMode {None, Sleep, Wake, Reverse}                     // 시뮬레이션 모드
 
-    private static double[] sensorData;                     // 센서 데이터를 임시로 보관하는 List
-    private static int curSensorDataIdx;                    // 현재 센서 데이터 배열의 인덱스
+    private static ArrayList<Double> sensorData;                     // 센서 데이터를 임시로 보관하는 List
     private static ArrayList<Integer> sensorDataCnt;         // 1초에 읽어온 센서 데이터의 갯수를 저장
     private double fftLChInputs [];                       // FFT 계산을 위한 Channel raw data 배열 변수
     private int inputCount = 0;                             // 읽어 온 센서 데이터 카운터
@@ -68,7 +69,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     // UI 변수
     private TextView txtBTStatus, txtMonitoring, fbChnageTerm;
     private Button btnBTConnect;
-    private Spinner spinner;
+    private Spinner modelSpinner, soundSpinner;
     private RadioGroup rgSoundSpeed;
     private SeekBar pBarFBTime;
     private ImageView imgView;
@@ -89,12 +90,11 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
         setContentView(R.layout.activity_neurofeedback);
 
-        curSensorDataIdx = 0;                                               // 현재 sensorData 배열의 인덱스를 0으로 설정
-        sensorData = new double[7500];                                      // 250hz 이므로 30초당 7500개의 센서 데이터 저장
-        sensorDataCnt = new ArrayList<Integer>();                           // 30초 동안 읽어온 데이터의 갯수를 저장
+        sensorData = new ArrayList<>();                                     // 센서 데이터를 임시로 보관하는 List
+        sensorDataCnt = new ArrayList<>();                                  // 30초 동안 읽어온 데이터의 갯수를 저장
 
-        xAlphaThetaArray = new ArrayList<Double>();                          // Alpha / Theta 회귀식을 구하기 위한 x 값 배열
-        yAlphaThetaArray = new ArrayList<Double>();                          // Alpha / Theta 회귀식을 구하기 위한 y 값 배열
+        xAlphaThetaArray = new ArrayList<>();                          // Alpha / Theta 회귀식을 구하기 위한 x 값 배열
+        yAlphaThetaArray = new ArrayList<>();                          // Alpha / Theta 회귀식을 구하기 위한 y 값 배열
 
         bt = new BluetoothSPP(this);                                // Bluetooth 초기화
         bt.setOnDataReceivedListener(new OnDataReceivedListener() {          // 블루투스 데이터 수신 리스너
@@ -109,7 +109,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         sleepImg = getResources().getDrawable(R.drawable.sleep);
         wakeImg = getResources().getDrawable(R.drawable.wake);
 
-        TabHost tabHost = (TabHost) findViewById(R.id.TabHost);
+        TabHost tabHost = findViewById(R.id.TabHost);
         tabHost.setup();
 
         TabHost.TabSpec ts1 = tabHost.newTabSpec("Main");
@@ -122,7 +122,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         ts2.setIndicator("설정");
         tabHost.addTab(ts2);
 
-        RadioGroup rgFeedbackMethod = (RadioGroup) findViewById(R.id.rgroupFeedback);
+        RadioGroup rgFeedbackMethod = findViewById(R.id.rgroupFeedback);
         rgFeedbackMethod.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(RadioGroup group, int checkedId) {
@@ -130,24 +130,24 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                     typeOfFB = 0;                           // 볼륨 줄이기 피드백
 
                     for (int i = 0 ; i < rgSoundSpeed.getChildCount() ; i++)
-                        ((RadioButton)rgSoundSpeed.getChildAt(i)).setEnabled(true);     // 수동으로 소리간격 조절하는 옵션 활성화하기
+                        (rgSoundSpeed.getChildAt(i)).setEnabled(true);                  // 수동으로 소리간격 조절하는 옵션 활성화하기
                     rgSoundSpeed.check(R.id.rbtnSet50);
 
                 } else {
                     typeOfFB = 1;                           // 간격 조절 피드백
                     for (int i = 0 ; i < rgSoundSpeed.getChildCount() ; i++)
-                        ((RadioButton)rgSoundSpeed.getChildAt(i)).setEnabled(false);     // 수동으로 소리간격 조절하는 옵션 비활성화하기
+                        (rgSoundSpeed.getChildAt(i)).setEnabled(false);     // 수동으로 소리간격 조절하는 옵션 비활성화하기
                 }
 
                 rgSoundSpeed.check(R.id.rbtnSet50);       // 피드백 타입이 바뀌면 값을 초기화 하기
-                pBarFBTime.setProgress(30);
+                pBarFBTime.setProgress(1);
                 if (soundRunnable != null)
                     soundRunnable.setVolume(1.0f);
             }
         });
         rgFeedbackMethod.check(R.id.rbtnSetVolume);
 
-        rgSoundSpeed = (RadioGroup) findViewById(R.id.rgSoundSpeed);                            // 물방울 소리 간격 조절
+        rgSoundSpeed = findViewById(R.id.rgSoundSpeed);                            // 물방울 소리 간격 조절
         rgSoundSpeed.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 switch (checkedId) {
@@ -162,7 +162,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             }
         });
 
-        RadioGroup rgSimulation = (RadioGroup)findViewById(R.id.rgSimulation);                             // 시뮬레이션 모드 설정
+        RadioGroup rgSimulation = findViewById(R.id.rgSimulation);                             // 시뮬레이션 모드 설정
         rgSimulation.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 switch (checkedId) {
@@ -170,7 +170,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         simMode = SimulationMode.None;
 
                         rgSoundSpeed.check(R.id.rbtnSet50);                                     // 일반 모드로 돌아오면 모든 값 초기화하기
-                        pBarFBTime.setProgress(30);
+                        pBarFBTime.setProgress(1);
                         if (soundRunnable != null)
                             soundRunnable.setVolume(1.0f);
 
@@ -191,41 +191,48 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         });
 
          // 수면 예측 모델 선택 스피너 아이템 초기화
-        spinner = (Spinner) findViewById(R.id.spnModelSelection);   // 스피너에 리스트 추가
-        ArrayAdapter<String> spinnerListAdapter = new ArrayAdapter<String>(this,
+        modelSpinner = findViewById(R.id.spnModelSelection);   // 스피너에 리스트 추가
+        ArrayAdapter<String> spinnerListAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, MODEL_LIST);
-        spinner.setAdapter(spinnerListAdapter);
-        spinner.setSelection(1);
+        modelSpinner.setAdapter(spinnerListAdapter);
+        modelSpinner.setSelection(1);
 
-        fbChnageTerm = (TextView)findViewById(R.id.tboxFBChangeTerm);
-        feedbackChangeTime = Integer.parseInt(fbChnageTerm.getText().toString());       // 변화를 주는 시간 텀
+        // 소리 선택 스피터 아이템 초기화
+        soundSpinner = findViewById(R.id.spnSoundSelection);    // 사운드 선택 리스트 추가
+        ArrayAdapter<String> soundSpinnerListAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, SOUND_LIST);
+        soundSpinner.setAdapter(soundSpinnerListAdapter);
+        soundSpinner.setSelection(1);
 
-        pBarFBTime = (SeekBar) findViewById(R.id.pBarFeedbackChangeTime);
+        fbChnageTerm = findViewById(R.id.tboxFBChangeTerm);
+        feedbackChangeTime = Integer.parseInt(fbChnageTerm.getText().toString()) * 60;       // 변화를 주는 시간 텀 (분 * 60 = 초 단위로 변경)
+
+        pBarFBTime = findViewById(R.id.pBarFeedbackChangeTime);
         pBarFBTime.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 fbChnageTerm.setText(String.valueOf(progress));
-                feedbackChangeTime = progress;
+                feedbackChangeTime = progress * 60;
             }
             public void onStartTrackingTouch(SeekBar seekBar) {}
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        Switch switchFileRecording = (Switch)findViewById(R.id.switchFileRecording);
+        Switch switchFileRecording = findViewById(R.id.switchFileRecording);
         switchFileRecording.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 optionOfFileWrite = isChecked;
             }
         });
 
-        txtBTStatus = (TextView)findViewById(R.id.textBTStatus);
-        txtMonitoring = (TextView)findViewById(R.id.tboxStatus);
+        txtBTStatus = findViewById(R.id.textBTStatus);
+        txtMonitoring = findViewById(R.id.tboxStatus);
         txtMonitoring.setMovementMethod(new ScrollingMovementMethod());
 
-        imgView = (ImageView)findViewById(R.id.imageView);
+        imgView = findViewById(R.id.imageView);
         imgView.setImageDrawable(wakeImg);
 
         // 블루투스 연결 버튼 클릭 리스너 등록
-        btnBTConnect = (Button) findViewById(R.id.btnBTConnect);
+        btnBTConnect = findViewById(R.id.btnBTConnect);
         btnBTConnect.setOnClickListener(this);
 
         bt.setBluetoothConnectionListener(new BluetoothConnectionListener() {
@@ -259,8 +266,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 secCount = -1;                      // 경과 시간 초기화
                 inputCount = 0;                     // 초당 센싱 데이터 초기화
-                curSensorDataIdx = 0;               // sensorData 인덱스 초기화
-                sensorData = new double[7500];      // 센싱 데이터 배열 초기화
+
+                sensorData.clear();                 // 센싱 데이터 배열 초기화
                 sensorDataCnt.clear();              // 센싱 데이터 갯수 배열 초기화
 
             }
@@ -350,7 +357,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 case 1:             // 센서 ReadingThread로부터 데이터를 읽어오는 핸들러
 
                     inputCount++;
-                    sensorData[curSensorDataIdx++] = (double)msg.arg1;              // sensorData 배열에 현재 센서값 넣기
+
+                    lock.lock();
+                    sensorData.add((double) msg.arg1);
+                    lock.unlock();
 
                     break;
 
@@ -373,14 +383,14 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         txtMonitoring.append("Alpha/Theta 회귀식의 기울기는 " + String.format("%.5f", gradient) + "입니다.\n");
                     }
 
-                    if (spinner.getSelectedItemPosition() == 0) {
+                    if (modelSpinner.getSelectedItemPosition() == 0) {
                         sleepStageClass = (-0.0022 * result[0]) + (-0.0016 * result[1]) +
                                         (0.0049 * result[2]) + (-0.0031 * result[3]) +
                                         (-0.124 * result[4]) + (0.3691 * result[5]) +
                                         (0.2545 * result[6]) + (-0.4685 * result[7]) +
                                         (0.4833 * result[8]) + (-1.0742 * result[9]) +
                                         (-0.6102 * result[10]) + (5.2727 * result[11]) - 6.5939;
-                    } else if (spinner.getSelectedItemPosition() == 1) {
+                    } else if (modelSpinner.getSelectedItemPosition() == 1) {
                         sleepStageClass = (0 * result[0]) + (0 * result[1]) +
                                         (0 * result[2]) + (0 * result[3]) +
                                         (-0.0001 * result[4]) + (0.0004 * result[5]) +
@@ -504,7 +514,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 if (optionOfFileWrite) {
                     msg = Message.obtain(readThread.mBackHandler, 4);                        // 파일로 피드백 이벤트 기록
                     msg.what = 4;
-                    msg.obj = new double[]{spinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, soundDelay, optionOfFileWrite ? 1 : 0, simMode == SimulationMode.None ? 0 : 1};
+                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, soundDelay, optionOfFileWrite ? 1 : 0, simMode == SimulationMode.None ? 0 : 1};
                     readThread.mBackHandler.sendMessage(msg);
                 }
 
@@ -549,7 +559,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                     msg = Message.obtain(readThread.mBackHandler, 4);                        // 파일로 피드백 이벤트 기록
                     msg.what = 4;
-                    msg.obj = new double[]{spinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, soundDelay, optionOfFileWrite ? 1 : 0, simMode == SimulationMode.None ? 0 : 1};
+                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, soundDelay, optionOfFileWrite ? 1 : 0, simMode == SimulationMode.None ? 0 : 1};
                     readThread.mBackHandler.sendMessage(msg);
 
                 }
@@ -568,10 +578,11 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 // 31초면 맨 앞의 센서 데이터 갯수를 가져와 해당 센서 데이터 list에서 그 갯수만큼 지우기
                 if (sensorDataCnt.size() == 30) {
+                    lock.lock();
                     int removeDatasize = sensorDataCnt.get(0);
                     sensorDataCnt.remove(0);
-                    System.arraycopy(sensorData, removeDatasize, sensorData, 0, sensorData.length - removeDatasize);
-                    curSensorDataIdx = curSensorDataIdx - removeDatasize;           // sensorData의 현재 index에서 삭제된 데이터만큼 뺌
+                    sensorData.subList(0,removeDatasize).clear();
+                    lock.unlock();
                 }
                 sensorDataCnt.add(inputCount);                           // 1초 동안 읽어온 데이터의 갯수 저장
 
@@ -581,9 +592,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                     if (bt.getServiceState() == BluetoothState.STATE_CONNECTED) {
 
-                        // curSensorDataIdx 크기만큼의 배열을 만들고, array 복사하기
-                        fftLChInputs = new double[curSensorDataIdx];
-                        System.arraycopy(sensorData, 0, fftLChInputs, 0, curSensorDataIdx);
+                        // ArrayList<Double>을 double 형태로 변환하여 저장
+                        fftLChInputs = ArrayUtils.toPrimitive(sensorData.toArray(new Double[sensorData.size()]));
 
                         DoubleFFT_1D fft_LCh1D = new DoubleFFT_1D(fftLChInputs.length);
                         double[] fft_LCh = new double[fftLChInputs.length * 2];
@@ -591,7 +601,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         System.arraycopy(fftLChInputs, 0, fft_LCh, 0, fftLChInputs.length);
                         fft_LCh1D.realForwardFull(fft_LCh);
 
-                        double realValue_l, imagValue_l, psValue_l;
+                        double realValue_l, imgValue_l, psValue_l;
                         double [] delta = new double[126];
                         double [] theta = new double[133];
                         double [] alpha = new double[167];
@@ -600,9 +610,9 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                         for (int i = 2; i < fft_LCh.length - 1; i += 2) {
                             realValue_l = fft_LCh[i];
-                            imagValue_l = fft_LCh[i + 1];
+                            imgValue_l = fft_LCh[i + 1];
 
-                            psValue_l = Math.sqrt(Math.pow(realValue_l, 2) + Math.pow(imagValue_l, 2));
+                            psValue_l = Math.sqrt(Math.pow(realValue_l, 2) + Math.pow(imgValue_l, 2));
 
                             if (i >= 14 && i < 266 ) {												// Delta 영역: 14/2 = 7(0.21Hz) ~ 266/2 = 133(3.99Hz)
                                 delta[delta_cnt++] = psValue_l;
@@ -617,7 +627,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                         double[] result = calcMetrics(delta, theta, alpha, beta);
 
-                        msg = Message.obtain(mHandler, 2);
+//                        msg = Message.obtain(mHandler, 2);
+                        msg = Message.obtain();
                         msg.what = 2;
                         msg.arg1 = secCount;
                         msg.arg2 = inputCount;
@@ -640,10 +651,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 double alpha_mean = getMean(alpha);
                 double beta_mean = getMean(beta);
 
-                double delta_stdev = getStdev(delta, delta_mean);
-                double theta_stdev = getStdev(theta, theta_mean);
-                double alpha_stdev = getStdev(alpha, alpha_mean);
-                double beta_stdev = getStdev(beta, beta_mean);
+                double delta_stdev = getStd(delta, delta_mean);
+                double theta_stdev = getStd(theta, theta_mean);
+                double alpha_stdev = getStd(alpha, alpha_mean);
+                double beta_stdev = getStd(beta, beta_mean);
 
                 double alphaBytheta = alpha_mean / theta_mean;
                 double alphaBydelta = alpha_mean / delta_mean;
@@ -669,7 +680,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         return totalSum/array.length;
     }
 
-    public static double getStdev(double [] array, double mean) {
+    public static double getStd(double [] array, double mean) {
         double sum = 0.0;
         double sd = 0.0;
         double diff;
@@ -718,7 +729,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     public double[] toDoublePrimitive(ArrayList<Double> doubles) {
         double[] target = new double[doubles.size()];
         for (int i = 0 ; i < target.length ; i++)
-            target[i] = doubles.get(i).doubleValue();
+            target[i] = doubles.get(i);
 
         return target;
     }
