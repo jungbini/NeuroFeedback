@@ -19,7 +19,7 @@ import app.akexorcist.bluetotohspp.library.BluetoothState;
 import app.akexorcist.bluetotohspp.library.DeviceList;
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.BluetoothConnectionListener;
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.OnDataReceivedListener;
-import bluetoothspp.akexorcist.app.DataProcessing.DataReadingThread;
+import bluetoothspp.akexorcist.app.DataProcessing.DataIOThread;
 
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
@@ -55,7 +55,7 @@ public class TestActivity extends Activity implements OnClickListener {
 
     BluetoothSPP bt;                                // BluetoothSPP 변수
 
-    DataReadingThread readThread;                  // 센서값 읽기 쓰레드 변수
+    DataIOThread readThread;                  // 센서값 읽기 쓰레드 변수
     Message msg;
 
     int msgType;                                   // 데이터 측정을 수행할 메시지 타입 (0=raw 데이터, 1=FFT 수행 후 파워 스팩트럼)
@@ -100,7 +100,7 @@ public class TestActivity extends Activity implements OnClickListener {
         bt = new BluetoothSPP(this);                                // Bluetooth 초기화
         initChart(2);                                                   // Line, Bar 차트 초기화
 
-        readThread = new DataReadingThread(mHandler, getApplicationContext());                      // Data reading 쓰레드 시작
+        readThread = new DataIOThread(mHandler, getApplicationContext());                      // Data reading 쓰레드 시작
         readThread.setDaemon(true);
         readThread.start();
 

@@ -1,7 +1,6 @@
 package bluetoothspp.akexorcist.app.NeuroAnalyzer;
 
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.view.View;
 

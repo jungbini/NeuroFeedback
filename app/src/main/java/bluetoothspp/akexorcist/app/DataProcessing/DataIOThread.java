@@ -20,7 +20,7 @@ import java.util.Date;
  * Created by jungbini on 2018-03-28.
  */
 
-public class DataReadingThread extends Thread {
+public class DataIOThread extends Thread {
 
     private Handler mMainHandler;
     public Handler mBackHandler;
@@ -53,10 +53,10 @@ public class DataReadingThread extends Thread {
     private int writingCount;                                       // 한 파일당 저장되는 라인수 카운터
     private DecimalFormat df = new DecimalFormat("#.###");
 
-    private SimpleDateFormat fullDateFormat = new SimpleDateFormat("MMM dd,yyyy HH:mm:ss");
+    private SimpleDateFormat fullDateFormat = new SimpleDateFormat("MM,dd,yyyy HH:mm:ss");
     private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("MMddyyyy");
 
-    public DataReadingThread(Handler handler, Context context) {
+    public DataIOThread(Handler handler, Context context) {
 
         mMainHandler = handler;
         writingCount = 0;
@@ -73,12 +73,6 @@ public class DataReadingThread extends Thread {
         if(!rawDataPath.exists()) {
             rawDataPath.mkdir();
         }
-
-//        try {
-//            fosInternal = context.openFileOutput("test.txt", Context.MODE_WORLD_WRITEABLE| Context.MODE_APPEND);
-//        } catch (FileNotFoundException fnfe) {
-//            fnfe.printStackTrace();
-//        }
 
     }
 
@@ -164,12 +158,11 @@ public class DataReadingThread extends Thread {
                                         int channel1_value = ((packetStreamData[0] & 0x7f) * 256) + (packetStreamData[1] & 0xff);
                                         int channel2_value = ((packetStreamData[2] & 0x7f) * 256) + (packetStreamData[3] & 0xff);
 
-                                        retmsg = Message.obtain();
-
                                         switch (msg.what) {
 
                                             // 차트 출력 모드
                                             case 0:
+                                                retmsg = Message.obtain(mMainHandler, 0);
                                                 retmsg.what = 0;
                                                 retmsg.arg1 = channel1_value;
                                                 retmsg.arg2 = channel2_value;
@@ -178,6 +171,7 @@ public class DataReadingThread extends Thread {
 
                                             // FFT 변환 모드
                                             case 1:
+                                                retmsg = Message.obtain(mMainHandler, 1);
                                                 retmsg.what = 1;
                                                 retmsg.arg1 = channel1_value;
                                                 retmsg.arg2 = channel2_value;
@@ -240,56 +234,30 @@ public class DataReadingThread extends Thread {
                     now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
                     Date resultdate = new Date(now);
 
-                    rawDataFile = new File(mSdPath + "/neuro/PSdata_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
+                    rawDataFile = new File(mSdPath + "/neuro/NeuroFeedback_" + resultdate + ".txt");
 
                     try {
-                        datafos = new FileOutputStream(rawDataFile, true);
-                        Thread.sleep(300);
+                        if (datafos == null)
+                            datafos = new FileOutputStream(rawDataFile, true);
+
+                        String finalResult = "";
+                        if (msg.obj != null) {
+                            // 보낸 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Delta파 비율, Sleep/Wake 확률
+                            double[] receivedLogMsg = (double[]) msg.obj;
+                            finalResult = fullDateFormat.format(resultdate) + ',' + df.format(receivedLogMsg[0]) + ',' + df.format(receivedLogMsg[1]) + ',' + df.format(receivedLogMsg[2]) + ',' +
+                                    df.format(receivedLogMsg[3]) + ',' + df.format(receivedLogMsg[4]) + ',' + df.format(receivedLogMsg[5]) + ',' +
+                                    (((receivedLogMsg[6] * 1000000) > 50.0) ? "Wake" : "Sleep") + "\n";
+                        } else {
+                            finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0,0,unknown\n";
+                        }
+
+                        datafos.write(finalResult.getBytes());
+                        datafos.flush();
+
                     } catch (FileNotFoundException fnfe) {
                         fnfe.printStackTrace();
-                    } catch (InterruptedException ie) {
-                        ie.printStackTrace();
-                    }
-
-                    // 파일로 기록하기
-                    try {
-                        if (writingCount > 450000) {                      // 45만줄이면 약 30분 가량의 데이터 {
-                            datafos.close();
-
-                            hourCount++;                                    // 30분이 지남
-
-                            rawDataFile = new File(mSdPath + "/neuro/PSdata_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
-
-                            try {
-                                datafos = new FileOutputStream(rawDataFile, true);
-                                Thread.sleep(300);
-                            } catch (FileNotFoundException fnfe) {
-                                fnfe.printStackTrace();
-                            } catch (InterruptedException ie) {
-                                ie.printStackTrace();
-                            } finally {
-                                writingCount = 0;
-                            }
-                        } else {
-                            writingCount++;
-
-                            String finalResult = "";
-                            if (msg.obj != null) {
-                                double[] tmpResults = (double[]) msg.obj;
-                                finalResult = fullDateFormat.format(resultdate) + ',' + df.format(tmpResults[0]) + ',' + df.format(tmpResults[1]) + ',' + df.format(tmpResults[2]) + ',' +
-                                        df.format(tmpResults[3]) + ',' + df.format(tmpResults[4]) + ',' + df.format(tmpResults[5]) + ',' +
-                                        df.format(tmpResults[6]) + ',' + df.format(tmpResults[7]) + ',' + df.format(tmpResults[8]) + ',' +
-                                        df.format(tmpResults[9]) + ',' + df.format(tmpResults[10]) + ',' + df.format(tmpResults[11]) + ',' +
-                                        String.valueOf(msg.arg1 / 1000000) + "," + String.valueOf(msg.arg2 == 0 ? "Wake" : "Sleep") + "\n";
-                            } else {
-                                finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0,0,0,0,0,0,0,0,None\n";
-                            }
-
-                            if (datafos != null) {
-                                datafos.write(finalResult.getBytes());
-                            }
-                        }
-                    } catch (IOException ioe) {
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
 
                 } else if (msg.what == 4) {                                 // 피드백 이벤트 로그 기록하기

@@ -38,11 +38,13 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="68dp"
+        android:enabled="false"
         android:text="테스트"
         android:textAlignment="center"
         android:textAppearance="@style/TextAppearance.AppCompat.Headline"
         android:textColor="@android:color/background_light"
         android:textSize="15dp"
-        android:visibility="visible" />
+        android:visibility="visible"
+        tools:enabled="false" />
 
 </RelativeLayout>

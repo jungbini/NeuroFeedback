@@ -12,7 +12,6 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
@@ -35,7 +34,7 @@ import app.akexorcist.bluetotohspp.library.BluetoothSPP.BluetoothConnectionListe
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.OnDataReceivedListener;
 import app.akexorcist.bluetotohspp.library.BluetoothState;
 import app.akexorcist.bluetotohspp.library.DeviceList;
-import bluetoothspp.akexorcist.app.DataProcessing.DataReadingThread;
+import bluetoothspp.akexorcist.app.DataProcessing.DataIOThread;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.LinearRegressionModel;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.RegressionModel;
 
@@ -47,24 +46,23 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private double gradient = 0;                                     // 회귀식 기울기
     private ArrayList<Double> xAlphaThetaArray;                      // 매초를 저장할 배열
     private ArrayList<Double> yAlphaThetaArray;                      // Alpha / Theta 비율 값을 저장할 배열
+    private double totalBrainPSValue = 0.0;                          // 총 뇌파 값 저장 변수
+    private double deltaPSValue = 0.0;                               // 총 Delta 값 저장 변수
 
     private final String [] MODEL_LIST = {"회귀모델(S1,2,3,4)", "회귀모델(S2,3,4)"};
     private final String [] SOUND_LIST = {"물방울 소리1", "물방울 소리2", "물방울 소리3"};
-    private enum SimulationMode {None, Sleep, Wake, Reverse}                     // 시뮬레이션 모드
+    //private enum SimulationMode {None, Sleep, Wake}                  // 시뮬레이션 모드
 
     private static ArrayList<Double> sensorData;                     // 센서 데이터를 임시로 보관하는 List
     private static ArrayList<Integer> sensorDataCnt;         // 1초에 읽어온 센서 데이터의 갯수를 저장
     private double fftLChInputs [];                       // FFT 계산을 위한 Channel raw data 배열 변수
     private int inputCount = 0;                             // 읽어 온 센서 데이터 카운터
     private int secCount = -1;                              // 30초 초기화 과정을 위한 카운터
-    private int typeOfSleepStage = 0;                     // 수면 타입 (0: Wake, 1: Sleep)
     private int typeOfFB = 0;                               // 피드백 종류 (0: 소리 줄이기, 1: 간격 늘리기)
-    private boolean optionOfFileWrite = false;           // 파일쓰기 옵션
     private long soundDelay = 5000L;                       // 물방울 반복 딜레이
     private float volumeLevel = 1.0f;                      // 초기 볼륨 값
     private int feedbackChangeTime = 0;                   // 피드백을 반영하기 까지 걸릴 시간
     private int feedbackElapsedTime = 1;                 // 피드백을 주기전 경과 시간
-    private SimulationMode simMode = SimulationMode.None;   // 시뮬레이션 모드 (기본값: 시뮬레이션 안함)
 
     // UI 변수
     private TextView txtBTStatus, txtMonitoring, fbChnageTerm;
@@ -75,10 +73,11 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private ImageView imgView;
     private Drawable sleepImg;
     private Drawable wakeImg;
+    private Switch switchFileRecording;
 
     private BluetoothSPP bt;                                  // BluetoothSPP 변수
 
-    private DataReadingThread readThread;                   // 센서 리딩 쓰레드
+    private DataIOThread readThread;                   // 센서 리딩 쓰레드
     private SoundRunnable soundRunnable;                   // 소리 재생 Runnable
     private Message msg;                                     // 센서 리딩 쓰레드에 보낼 메시지
 
@@ -99,7 +98,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         bt = new BluetoothSPP(this);                                // Bluetooth 초기화
         bt.setOnDataReceivedListener(new OnDataReceivedListener() {          // 블루투스 데이터 수신 리스너
             public void onDataReceived(byte[] data, String message) {
-                msg = new Message();
+                msg = Message.obtain(readThread.mBackHandler, 1);
                 msg.what = 1;
                 msg.obj = data;
                 readThread.mBackHandler.sendMessage(msg);
@@ -167,25 +166,17 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             public void onCheckedChanged(RadioGroup group, int checkedId) {
                 switch (checkedId) {
                     case R.id.rbtnNoSimulation:
-                        simMode = SimulationMode.None;
-
-                        rgSoundSpeed.check(R.id.rbtnSet50);                                     // 일반 모드로 돌아오면 모든 값 초기화하기
+                        rgSoundSpeed.check(R.id.rbtnSet50);                     // 일반 모드로 돌아오면 모든 값 초기화하기
                         pBarFBTime.setProgress(1);
                         if (soundRunnable != null)
                             soundRunnable.setVolume(1.0f);
-
                         break;
-                    case R.id.rbtnSleepMode:
-                        simMode = SimulationMode.Sleep; break;
-                    case R.id.rbtnWakeMode:
-                        simMode = SimulationMode.Wake;  break;
-                    case R.id.rbtnReverseFeedback:
-                        simMode = SimulationMode.Reverse;
-
-                        if (soundRunnable != null)
-                            soundRunnable.setVolume(0.0f);
-
-                        break;
+//                    case R.id.rbtnSleepMode:                                    // Sleep 시뮬레이션 모드이면 무조건 Sleep 상태
+//                        typeOfSleepStage = 1;
+//                        break;
+//                    case R.id.rbtnWakeMode:                                     // Wake 시뮬레이션 모드: 무조건 Wake 상태
+//                        typeOfSleepStage = 0;
+//                        break;
                 }
             }
         });
@@ -217,12 +208,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        Switch switchFileRecording = findViewById(R.id.switchFileRecording);
-        switchFileRecording.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                optionOfFileWrite = isChecked;
-            }
-        });
+        switchFileRecording = findViewById(R.id.switchFileRecording);
 
         txtBTStatus = findViewById(R.id.textBTStatus);
         txtMonitoring = findViewById(R.id.tboxStatus);
@@ -241,10 +227,9 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 txtBTStatus.setText("블루투스 장치 연결이 끊겼습니다.");
                 txtMonitoring.append("프로그램이 종료되었습니다.\n\n");
 
-                readThread.closeFileStream();                                   // 기록 중인 파일 스트림 중지
-
                 if (readThread != null) {
-                    readThread.interrupt();                                 // 센서 데이터 리딩 정지
+                    readThread.closeFileStream();                                   // 기록 중인 파일 스트림 중지
+                    readThread.interrupt();                                         // 센서 데이터 리딩 정지
                     readThread = null;
                 }
 
@@ -277,7 +262,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             }
             public void onDeviceConnected(String name, String address)
             {
-                readThread = new DataReadingThread(mHandler, getApplicationContext());          // Data reading 쓰레드 시작
+                readThread = new DataIOThread(mHandler, getApplicationContext());          // Data reading 쓰레드 시작
                 readThread.setDaemon(true);
                 readThread.start();                                                               // 센서 데이터 읽기 시작
 
@@ -354,23 +339,25 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             double sleepStageClass = 0.0;
             switch (msg.what) {
 
-                case 1:             // 센서 ReadingThread로부터 데이터를 읽어오는 핸들러
-
+                case 1:                                                             // 센서 ReadingThread로부터 데이터를 읽어오는 핸들러
                     inputCount++;
 
                     lock.lock();
-                    sensorData.add((double) msg.arg1);
+                    sensorData.add((double) ((msg.arg1 + msg.arg2) / 2));           // Left/Right 채널 평균으로 계산
                     lock.unlock();
 
                     break;
 
-                case 2:             // 예측 모델 회귀식이 들어갈 자리
+                case 2:                                                             // 예측 모델 회귀식이 들어갈 자리
 
                     double [] result = (double[]) msg.obj;
 
                     ++elapsedSecond;                                               // xAlphaThetaArray 리스트에 넣을 초 증가
                     xAlphaThetaArray.add(elapsedSecond);
                     yAlphaThetaArray.add(result[8]);
+
+                    totalBrainPSValue += result[0] + result[2] + result[4] + result[6];
+                    deltaPSValue += result[0];
 
                     if (elapsedSecond > 2) {                                       // ellapsedSecond 가 2초 이상이여야만 회귀분석 가능
                         double[] xArray = toDoublePrimitive(xAlphaThetaArray);
@@ -380,7 +367,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         regressionModel.compute();
                         gradient = regressionModel.getCoefficients()[1];     // 기울기 가져오기
 
-                        txtMonitoring.append("Alpha/Theta 회귀식의 기울기는 " + String.format("%.5f", gradient) + "입니다.\n");
+                        ((TextView)findViewById(R.id.tboxRegressionResult)).setText(String.format("%.5f", gradient));
                     }
 
                     if (modelSpinner.getSelectedItemPosition() == 0) {
@@ -403,129 +390,118 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                     expValue = ( Math.exp(sleepStageClass) / (1+Math.exp(sleepStageClass)) ) * 100;
 
                     // 최종 수면 상태 값
-                    ((TextView)findViewById(R.id.tboxModelValue)).setText(String.valueOf(expValue));
+                    ((TextView)findViewById(R.id.tboxModelValue)).setText(String.format("%.2f", expValue));
 
                     // 수면 상태 판별
-                    // ((TextView)findViewById(R.id.tboxSleepStage)).setText(sleepStageClass > 0 ? "잠이 깨는 중..." : "잠이 드는 중...");
                     if (gradient != 0)
-                        ((TextView)findViewById(R.id.tboxSleepStage)).setText(gradient > 0 ? "각성 상태(Alpha/Theta=" + String.format("%.2f", result[8]) + ")": "잠이 드는 중...(Alpha/Theta=" + String.format("%.2f", result[8]) + ")");
+                        ((TextView)findViewById(R.id.tboxSleepStage)).setText(expValue > 50 ? "Wake" : "Sleep");
                     else
                         ((TextView)findViewById(R.id.tboxSleepStage)).setText("회귀식 계산 중...");
 
-                    if (simMode == SimulationMode.None || simMode == SimulationMode.Reverse) {                  // 시뮬레이션을 하지 않으면 실제 값으로 수면 상태 판별
-                        // typeOfSleepStage = sleepStageClass > 0.5 ? 0 : 1;
-                        typeOfSleepStage = gradient > 0 ? 0 : 1;
-                    } else if (simMode == SimulationMode.Sleep) {                                               // Sleep 시뮬레이션 모드이면 무조건 Sleep 상태
-                        typeOfSleepStage = 1;
-                    } else if (simMode == SimulationMode.Wake) {                                                // Wake 시뮬레이션 모드이면 무조건 Wake 상태
-                        typeOfSleepStage = 0;
-                    }
+                    // 현재는 시뮬레이션 모드가 없으므로, Wake/Sleep 시뮬레이션 모드를 체크할 필요가 없음
+                    // typeOfSleepStage = sleepStageClass > 0.5 ? 0 : 1;
+                    int typeOfSleepStage = gradient > 0 ? 0 : 1;                        // 0: Wake, 1: Sleep
 
-                    if (typeOfSleepStage == 0)                                          // 수면 상태에 따라 메인 이미지 바꾸기
-                        imgView.setImageDrawable(wakeImg);
-                    else
-                        imgView.setImageDrawable(sleepImg);
+                    // 수면 상태에 따라 메인 이미지 바꾸기
+                    if (typeOfSleepStage == 0)      imgView.setImageDrawable(wakeImg);
+                    else                            imgView.setImageDrawable(sleepImg);
 
                     if (typeOfFB == 0) {                                                 // 피드백 형식이 소리 줄이기(0)인지, 간격 줄이기(1)인지에 따라 다른 기능 수행
-                        volumeFBProcess();
+                        volumeFBProcess(typeOfSleepStage, expValue);
                     } else {
-                        freqFBProcess();
+                        freqFBProcess(typeOfSleepStage, expValue);
                     }
 
                 case 3:
 
                     // 모니터링 현황 알림
-                    String infoMsg = msg.arg1 < 30 ? "30초동안 데이터를 모으는 중입니다." : "뇌파 스펙트럼 분석 중...";
-                    String str = "경과 시간: " + msg.arg1 + ", 수집된 센서 데이터 수:" + msg.arg2;
+                    String strFeedbackTime = "피드백 " + (feedbackChangeTime - feedbackElapsedTime) + "초 남음";
+                    String infoMsg = msg.arg1 < 30 ? "초기 데이터 수집중...(" + msg.arg1 + "초/30초)" : "뇌파 분석 중...(" + msg.arg1 + "초 경과/" + strFeedbackTime + ")";
 
                     inputCount = 0;                                                                 // inputCount를 다시 초기화
-
-                    txtMonitoring.append(infoMsg + "\n" + str + '\n');
-
-                    if (optionOfFileWrite) {
-
-                        StringBuffer tmpStr = new StringBuffer();
-
-
-                        Message msg2 = new Message();
-                        msg2.what = 3;
-                        msg2.arg1 = (int) (expValue * 1000000);
-                        msg2.arg2 = sleepStageClass > 0.5 ? 0:1;
-                        msg2.obj = msg.obj;
-                        readThread.mBackHandler.sendMessage(msg2);
-                    }
+                    txtMonitoring.append(infoMsg + "\n");
 
                     break;
 
-                case 4:
-                    txtMonitoring.append("현재 볼륨은 " + (float)msg.obj + "입니다.\n");
+                case 4:     // 파일로 기록하기
+
+                    StringBuffer tmpStr = new StringBuffer();
+
+                    Message msg2 = new Message();
+                    msg2.what = 3;
+                    msg2.arg1 = (int) (expValue * 1000000);
+                    msg2.arg2 = sleepStageClass > 0.5 ? 0:1;
+                    msg2.obj = msg.obj;
+                    readThread.mBackHandler.sendMessage(msg2);
+
                     break;
 
                 case 5:
-                    txtMonitoring.append("현재 소리 간격은 " + (long)msg.obj + "입니다.\n");
+                    txtMonitoring.append("현재 소리 간격 = " + (long)msg.obj + "\n");
                     break;
 
             }
         }
     };
 
-    public void volumeFBProcess() {
+    public void volumeFBProcess(int typeOfSleepStage, double expValue) {
 
         // 잠이 드는 상태이고, 볼륨이 0 이면 피드백을 중단
         if ( typeOfSleepStage == 1 && volumeLevel == 0 ) {
-            if (simMode == SimulationMode.None) {                               // None 피드백일 경우에만 정지
-                txtMonitoring.append("볼륨 피드백이 중단 되었습니다.\n");
-                txtBTStatus.removeCallbacks(soundRunnable);
-            }
-        } else {                                                                // typeOfSleepStage가 0 (깨고 있는 중)이거나 volumeLevel이 0이 아니면,
+            txtMonitoring.append("볼륨 피드백 중지\n");
+            txtBTStatus.removeCallbacks(soundRunnable);
+        } else {                                                        // typeOfSleepStage가 0 (깨고 있는 중)이거나 volumeLevel이 0이 아니면,
 
             if (!txtBTStatus.getHandler().hasMessages(0)) {
                 txtBTStatus.post(soundRunnable);
-                txtMonitoring.append("중단됐던 볼륨 피드백을 다시 시작합니다.\n");
+                txtMonitoring.append("중단됐던 볼륨 피드백 재시작\n");
             }
 
             if (feedbackElapsedTime >= feedbackChangeTime) {           // 피드백 주기가 될 때까지 기다렸다가 볼륨 조절하기
 
-                feedbackElapsedTime = 0;                               // 경과 시간을 다시 0으로 설정
+                double deltaByTotalPS = deltaPSValue / totalBrainPSValue;
 
-                if (simMode == SimulationMode.None) {                   // 자극 -> 졸림 -> 자극 줄이기
-                    if (typeOfSleepStage == 0) {                        // 잠이 깨는 중이므로 볼륨 키우기
-                        volumeLevel += 0.1;
-                        if (volumeLevel >= 1.0f)
-                            volumeLevel = 1.0f;                         // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
-                    } else {                                            // 잠이 드는 중이므로 볼륨 줄이기
-                        volumeLevel -= 0.1;
-                        if (volumeLevel <= 0.0f)
-                            volumeLevel = 0.0f;                         // 볼륨이 0%보다 낮을 수 없으므로 0.0으로 고정
-                    }
-                } else if (simMode == SimulationMode.Reverse) {         // 자극 없음 -> 졸림 -> 자극 주기
-                    if (typeOfSleepStage == 0) {                        // Wake 상태에는 피드백 없음
+                if (typeOfSleepStage == 0) {                           // 잠이 깨는 중이므로 볼륨 키우기
+                    volumeLevel += 0.1;
+                    if (volumeLevel >= 1.0f)
+                        volumeLevel = 1.0f;                         // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
+
+                } else {                                            // 잠이 드는 중이므로 볼륨 줄이기
+
+                    // 볼륨이 최소 볼륨인 10%이고, delta 파의 비율이 1/3을 넘지 않으면 볼륨을 10%로 계속 유지
+                    if (volumeLevel == 0.1f && deltaByTotalPS < 33)
+                        volumeLevel = 0.1f;
+                    else if (volumeLevel <= 0.0f)                   // 볼륨이 0%보다 낮을 수 없으므로 0.0으로 고정
                         volumeLevel = 0.0f;
-                    } else {                                            // Sleep 상태에서 바로 피드백 추가
-                        volumeLevel += 0.1;
-                        if (volumeLevel >= 1.0f)
-                            volumeLevel = 1.0f;                         // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
-                    }
+                    else
+                        volumeLevel -= 0.1;
                 }
 
-                txtMonitoring.append("현재 볼륨은 " + volumeLevel + "입니다.\n");
+                txtMonitoring.append("현재 볼륨 = " + String.format("%.0f", volumeLevel*100) + "\n");
                 soundRunnable.setVolume(volumeLevel);
 
-                if (optionOfFileWrite) {
-                    msg = Message.obtain(readThread.mBackHandler, 4);                        // 파일로 피드백 이벤트 기록
-                    msg.what = 4;
-                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, soundDelay, optionOfFileWrite ? 1 : 0, simMode == SimulationMode.None ? 0 : 1};
+                if (switchFileRecording.isChecked()) {
+                    msg = Message.obtain(readThread.mBackHandler, 3);                        // 파일로 피드백 이벤트 기록
+                    msg.what = 3;
+
+                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Delta파 비율, Wake/Sleep 확률값
+                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, volumeLevel, soundDelay, deltaByTotalPS, expValue};
                     readThread.mBackHandler.sendMessage(msg);
                 }
 
+                txtMonitoring.append("Delta파의 비율 = " + String.format("%.2f", deltaByTotalPS*100) + "%\n");
+
+                feedbackElapsedTime = 0;                               // 경과 시간을 다시 0으로 설정
+                totalBrainPSValue = 0.0;                                // 총 뇌파 값 새로 저장
+                deltaPSValue = 0.0;                                     // 총 Theta 값 새로 저장
+
             } else {
                 feedbackElapsedTime++;                                 // 경과시간이 피드백 주기보다 작으면, +1
-                txtMonitoring.append("피드백을 주기 위한 경과 시간은 " + feedbackElapsedTime + "입니다.\n");
             }
         }
     }
 
-    public void freqFBProcess() {
+    public void freqFBProcess(int typeOfSleepStage, double expValue) {
 
         if ( typeOfSleepStage == 1 && soundDelay >= 60000 ) {          // 잠을 자는 상태이고, 딜레이가 60초가 넘으면
             txtMonitoring.append("소리 간격 피드백이 중단 되었습니다.\n");
@@ -555,13 +531,13 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 txtMonitoring.append("현재 소리 간격은 " + soundDelay + "입니다.\n");
                 soundRunnable.setInterval(soundDelay);                                          // 바로 소리 재생 딜레이로 반영
 
-                if (optionOfFileWrite) {
+                if (switchFileRecording.isChecked()) {
+                    msg = Message.obtain(readThread.mBackHandler, 3);                        // 파일로 피드백 이벤트 기록
+                    msg.what = 3;
 
-                    msg = Message.obtain(readThread.mBackHandler, 4);                        // 파일로 피드백 이벤트 기록
-                    msg.what = 4;
-                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, soundDelay, optionOfFileWrite ? 1 : 0, simMode == SimulationMode.None ? 0 : 1};
+                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Wake/Sleep 확률값
+                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, volumeLevel, soundDelay, expValue};
                     readThread.mBackHandler.sendMessage(msg);
-
                 }
 
             } else {
@@ -627,8 +603,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                         double[] result = calcMetrics(delta, theta, alpha, beta);
 
-//                        msg = Message.obtain(mHandler, 2);
-                        msg = Message.obtain();
+                        msg = Message.obtain(mHandler, 2);
                         msg.what = 2;
                         msg.arg1 = secCount;
                         msg.arg2 = inputCount;
