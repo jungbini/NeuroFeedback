@@ -9,42 +9,75 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".LoginActivity">
 
-    <ImageView
-        android:id="@+id/imgLogo"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/btnNeuroFeedback"
-        android:layout_alignParentStart="true"
-        android:layout_marginBottom="77dp"
-        android:src="@drawable/neurofeedback" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-    <Button
-        android:id="@+id/btnNeuroFeedback"
-        android:layout_width="300dp"
-        android:layout_height="100dp"
-        android:layout_above="@+id/btnLogin"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="67dp"
-        android:gravity="center_vertical|center_horizontal"
-        android:text="뉴로 피드백"
-        android:textAppearance="@style/TextAppearance.AppCompat.Headline"
-        android:textColor="@android:color/background_light"
-        android:textStyle="bold" />
+        <ImageView
+            android:id="@+id/imgLogo"
+            android:layout_width="wrap_content"
+            android:layout_height="258dp"
+            android:src="@drawable/neurofeedback" />
 
-    <Button
-        android:id="@+id/btnLogin"
-        android:layout_width="100dp"
-        android:layout_height="50dp"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="68dp"
-        android:enabled="false"
-        android:text="테스트"
-        android:textAlignment="center"
-        android:textAppearance="@style/TextAppearance.AppCompat.Headline"
-        android:textColor="@android:color/background_light"
-        android:textSize="15dp"
-        android:visibility="visible"
-        tools:enabled="false" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginTop="30dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnNeuroFeedback"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_margin="10dp"
+                android:layout_weight="0.5"
+                android:background="@drawable/main_buttonshape"
+                android:gravity="center_vertical|center_horizontal"
+                android:text="Neuro\nFeedback"
+                android:textAppearance="@style/TextAppearance.AppCompat.Headline"
+                android:textColor="@android:color/background_light"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/syncDB"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_margin="10dp"
+                android:layout_weight="0.5"
+                android:background="@drawable/main_buttonshape"
+                android:gravity="center_vertical|center_horizontal"
+                android:text="Upload\nData"
+                android:textAppearance="@style/TextAppearance.AppCompat.Headline"
+                android:textColor="@android:color/background_light" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginTop="150dp"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnLogin"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_margin="10dp"
+                android:layout_weight="0.5"
+                android:background="@drawable/main_buttonshape"
+                android:enabled="true"
+                android:text="Test Mode"
+                android:textAlignment="center"
+                android:textAppearance="@style/TextAppearance.AppCompat.Headline"
+                android:textColor="?attr/colorControlNormal"
+                android:textSize="20dp"
+                android:visibility="visible"
+                tools:enabled="true" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </RelativeLayout>

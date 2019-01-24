@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
@@ -40,6 +41,8 @@ import bluetoothspp.akexorcist.app.RegressionAnalysis.RegressionModel;
 
 public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
+    private final int ANALYSIS_SECOND = 60;                         // 센서 데이터 수집 시간(초)
+    private final double PS_HZ = 0.016667;                          // Power spectrum HZ
     private final ReentrantLock lock = new ReentrantLock();         // 쓰레드 lock을 위한 Util 클래스
 
     private double elapsedSecond = 0;                               // 경과된 초
@@ -416,7 +419,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                     // 모니터링 현황 알림
                     String strFeedbackTime = "피드백 " + (feedbackChangeTime - feedbackElapsedTime) + "초 남음";
-                    String infoMsg = msg.arg1 < 30 ? "초기 데이터 수집중...(" + msg.arg1 + "초/30초)" : "뇌파 분석 중...(" + msg.arg1 + "초 경과/" + strFeedbackTime + ")";
+                    String infoMsg = msg.arg1 < ANALYSIS_SECOND ? "초기 데이터 수집중...(" + msg.arg1 + "초/" + ANALYSIS_SECOND + "초)" : "뇌파 분석 중...(" + msg.arg1 + "초 경과/" + strFeedbackTime + ")";
 
                     inputCount = 0;                                                                 // inputCount를 다시 초기화
                     txtMonitoring.append(infoMsg + "\n");
@@ -552,8 +555,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
             public void run() {
 
-                // 31초면 맨 앞의 센서 데이터 갯수를 가져와 해당 센서 데이터 list에서 그 갯수만큼 지우기
-                if (sensorDataCnt.size() == 30) {
+                // 61초면 맨 앞의 센서 데이터 갯수를 가져와 해당 센서 데이터 list에서 그 갯수만큼 지우기
+                if (sensorDataCnt.size() == ANALYSIS_SECOND) {
                     lock.lock();
                     int removeDatasize = sensorDataCnt.get(0);
                     sensorDataCnt.remove(0);
@@ -564,7 +567,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 secCount++;
 
-                if (secCount >= 30) {
+                if (secCount >= ANALYSIS_SECOND) {
 
                     if (bt.getServiceState() == BluetoothState.STATE_CONNECTED) {
 
@@ -578,10 +581,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         fft_LCh1D.realForwardFull(fft_LCh);
 
                         double realValue_l, imgValue_l, psValue_l;
-                        double [] delta = new double[126];
-                        double [] theta = new double[133];
-                        double [] alpha = new double[167];
-                        double [] beta = new double[567];
+                        double [] delta = new double[230];      // (int) ((3.99-0.21)/PS_HZ)
+                        double [] theta = new double[250];
+                        double [] alpha = new double[310];
+                        double [] beta = new double[1040];
                         int delta_cnt = 0, theta_cnt = 0, alpha_cnt = 0, beta_cnt = 0;
 
                         for (int i = 2; i < fft_LCh.length - 1; i += 2) {
@@ -590,20 +593,21 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                             psValue_l = Math.sqrt(Math.pow(realValue_l, 2) + Math.pow(imgValue_l, 2));
 
-                            if (i >= 14 && i < 266 ) {												// Delta 영역: 14/2 = 7(0.21Hz) ~ 266/2 = 133(3.99Hz)
+                            if (i >= (int)(0.21 / PS_HZ  * 2) && i < (int)(3.99 / PS_HZ * 2) ) {		    // Delta 영역: 0.21Hz ~ 3.99Hz
                                 delta[delta_cnt++] = psValue_l;
-                            } else if (i >= 266 && i < 532) {										// Theta 영역: 266/2 = 133(3.99Hz) ~ 532/2 = 266(약 7.99Hz)
+                            } else if (i >= (int)(3.99 / PS_HZ * 2) && i < (int)(7.99 / PS_HZ * 2)) {	    // Theta 영역: 3.99Hz ~ 7.99Hz
                                 theta[theta_cnt++] = psValue_l;
-                            } else if (i >= 532 && i < 866) {										// Alpha 영역: 532/2 = 266(약 7.99Hz) ~ 866/2 = 433(12.99Hz)
+                            } else if (i >= (int)(7.99 / PS_HZ * 2) && i < (int)(12.99 / PS_HZ * 2)) {      // Alpha 영역: 7.99Hz ~ 12.99Hz
                                 alpha[alpha_cnt++] = psValue_l;
-                            } else if (i >= 866 && i < 2000) {										// Beta 영역: 866/2 = 433(12.99Hz) ~ 2000/2 = 1000(30Hz)
+                            } else if (i >= (int)(12.99 / PS_HZ * 2) && i < (int)(30 / PS_HZ * 2)) {		// Beta 영역: 12.99Hz ~ 30Hz
                                 beta[beta_cnt++] = psValue_l;
                             }
                         }
 
                         double[] result = calcMetrics(delta, theta, alpha, beta);
+                        Log.i("Power Spectrum result", "delta=" + result[0] + ", theta=" + result[2] + ", alpha=" + result[4] + ", beta=" + result[6]);
 
-                        msg = Message.obtain(mHandler, 2);
+                        msg = Message.obtain();
                         msg.what = 2;
                         msg.arg1 = secCount;
                         msg.arg2 = inputCount;
@@ -611,7 +615,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         mHandler.sendMessage(msg);
                     }
                 } else {                                                                            // 30초가 안되면 그냥 데이터 수집용 메시지만 보여주기
-                    msg = Message.obtain(mHandler, 3);
+                    if (msg == null)
+                        msg = new Message();
+                    else
+                        msg = Message.obtain();
                     msg.what = 3;
                     msg.arg1 = secCount;
                     msg.arg2 = inputCount;
@@ -648,9 +655,12 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
     public static double getMean(double [] array) {
         double totalSum = 0.0;
+        int original_length = array.length;
 
-        for (int i = 0 ; i < array.length ; i++)
+        for (int i = 0 ; i < array.length ; i++) {
+            if (array[i] == 0.0) original_length -= 1;
             totalSum += array[i];
+        }
 
         return totalSum/array.length;
     }
@@ -660,9 +670,15 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         double sd = 0.0;
         double diff;
 
+        int original_length = array.length;
+
         for (int i = 0 ; i < array.length ; i++) {
-            diff = array[i] - mean;
-            sum += diff * diff;
+            if (array[i] == 0.0) {
+                original_length -= 1;
+            } else {
+                diff = array[i] - mean;
+                sum += diff * diff;
+            }
         }
 
         sd = Math.sqrt(sum / array.length);
