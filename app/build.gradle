@@ -35,4 +35,8 @@ dependencies {
     // FFT 알고리즘
     implementation files('libs/JTransforms-3.1-with-dependencies.jar')
     implementation files('libs/commons-lang3-3.7.jar')
+
+    // 로깅 API
+    implementation 'log4j:log4j:1.2+'
+    implementation 'de.mindpipe.android:android-logging-log4j:1.0.3'
 }

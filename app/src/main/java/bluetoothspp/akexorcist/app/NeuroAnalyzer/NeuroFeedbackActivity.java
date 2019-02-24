@@ -1,10 +1,13 @@
 package bluetoothspp.akexorcist.app.NeuroAnalyzer;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.text.method.ScrollingMovementMethod;
@@ -23,9 +26,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.log4j.Logger;
 import org.jtransforms.fft.DoubleFFT_1D;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,12 +44,14 @@ import app.akexorcist.bluetotohspp.library.DeviceList;
 import bluetoothspp.akexorcist.app.DataProcessing.DataIOThread;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.LinearRegressionModel;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.RegressionModel;
+import de.mindpipe.android.logging.log4j.LogConfigurator;
 
 public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
     private final int ANALYSIS_SECOND = 60;                         // 센서 데이터 수집 시간(초)
     private final double PS_HZ = 0.016667;                          // Power spectrum HZ
     private final ReentrantLock lock = new ReentrantLock();         // 쓰레드 lock을 위한 Util 클래스
+    private Logger mLogger = Logger.getLogger(NeuroFeedbackActivity.class);
 
     private double elapsedSecond = 0;                               // 경과된 초
     private double gradient = 0;                                     // 회귀식 기울기
@@ -77,6 +85,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private Drawable sleepImg;
     private Drawable wakeImg;
     private Switch switchFileRecording;
+    private AlertDialog.Builder alertDialog;
 
     private BluetoothSPP bt;                                  // BluetoothSPP 변수
 
@@ -89,8 +98,19 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_neurofeedback);
+
+        // 로그 설정
+        String ext = Environment.getExternalStorageState();
+        String mSdPath;
+        if(ext.equals(Environment.MEDIA_MOUNTED))
+            mSdPath = Environment.getExternalStorageDirectory().getAbsolutePath();
+        else
+            mSdPath = Environment.MEDIA_UNMOUNTED;
+
+        LogConfigurator logConfigurator = new LogConfigurator();            // 로그 관련 설정
+        logConfigurator.setFileName(mSdPath + "/neuro/logs/logFile.log");
+        logConfigurator.configure();
 
         sensorData = new ArrayList<>();                                     // 센서 데이터를 임시로 보관하는 List
         sensorDataCnt = new ArrayList<>();                                  // 30초 동안 읽어온 데이터의 갯수를 저장
@@ -101,10 +121,15 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         bt = new BluetoothSPP(this);                                // Bluetooth 초기화
         bt.setOnDataReceivedListener(new OnDataReceivedListener() {          // 블루투스 데이터 수신 리스너
             public void onDataReceived(byte[] data, String message) {
-                msg = Message.obtain(readThread.mBackHandler, 1);
+                // msg = Message.obtain(readThread.mBackHandler, 1);
+                msg = readThread.mBackHandler.obtainMessage();
                 msg.what = 1;
                 msg.obj = data;
-                readThread.mBackHandler.sendMessage(msg);
+                try {
+                    readThread.mBackHandler.sendMessage(msg);
+                } catch (IllegalStateException ise) {
+                    mLogger.error(Arrays.toString(ise.getStackTrace()));
+                }
             }
         });
 
@@ -262,6 +287,13 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
             public void onDeviceConnectionFailed() {
                 txtBTStatus.setText("블루투스 장치에 연결 실패! Orz...");
+
+                alertDialog.setTitle("다음을 확인해보세요.");
+                alertDialog.setMessage("1. 뇌파 측정 기기(Neuronicle)가 켜져 있는지 확인합니다.\n" +
+                                       "2. 스마트폰이나 테블릿의 블루투스가 켜져 있는지 확인합니다.\n");
+                alertDialog.show();
+
+                mLogger.error("블루투스 장치 연결 실패!");
             }
             public void onDeviceConnected(String name, String address)
             {
@@ -280,6 +312,14 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 txtBTStatus.post(soundRunnable);
             }
         });
+
+        alertDialog = new AlertDialog.Builder(this);
+        alertDialog.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                dialogInterface.dismiss();
+            }
+        });
     }
 
     public void onStart() {
@@ -287,6 +327,13 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         if (!bt.isBluetoothEnabled()) {         // 블루투스가 켜져 있지 않으면 켜도록 권유
             Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(intent, BluetoothState.REQUEST_ENABLE_BT);
+
+            alertDialog.setTitle("블루투스 연결하기");
+            alertDialog.setMessage("1. 먼저 뇌파 측정 기기(Neuronicle)를 켜고, 머리에 착용합니다.\n" +
+                               "2. 블루투스 연결에서 '연결' 버튼을 눌러, neuroNicle E2를 선택합니다.\n" +
+                               "3. 연결이 완료되면 뇌파 측정을 시작합니다.");
+            alertDialog.show();
+
         } else {
             if(!bt.isServiceAvailable()) {
                 bt.setupService();
@@ -410,9 +457,9 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                     else                            imgView.setImageDrawable(sleepImg);
 
                     if (typeOfFB == 0) {                                                 // 피드백 형식이 소리 줄이기(0)인지, 간격 줄이기(1)인지에 따라 다른 기능 수행
-                        volumeFBProcess(typeOfSleepStage, expValue);
+                        volumeFBProcess(typeOfSleepStage, expValue, result, gradient);
                     } else {
-                        freqFBProcess(typeOfSleepStage, expValue);
+                        freqFBProcess(typeOfSleepStage, expValue, result, gradient);
                     }
 
                 case 3:
@@ -447,7 +494,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         }
     };
 
-    public void volumeFBProcess(int typeOfSleepStage, double expValue) {
+    public void volumeFBProcess(int typeOfSleepStage, double expValue, double[] result, double gradient) {
 
         // 잠이 드는 상태이고, 볼륨이 0 이면 피드백을 중단
         if ( typeOfSleepStage == 1 && volumeLevel == 0 ) {
@@ -484,12 +531,18 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 soundRunnable.setVolume(volumeLevel);
 
                 if (switchFileRecording.isChecked()) {
-                    msg = Message.obtain(readThread.mBackHandler, 3);                        // 파일로 피드백 이벤트 기록
+                    // msg = Message.obtain(readThread.mBackHandler, 3);                        // 파일로 피드백 이벤트 기록
+                    msg = readThread.mBackHandler.obtainMessage();                        // 파일로 피드백 이벤트 기록
                     msg.what = 3;
 
-                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Delta파 비율, Wake/Sleep 확률값
-                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, volumeLevel, soundDelay, deltaByTotalPS, expValue};
-                    readThread.mBackHandler.sendMessage(msg);
+                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, 회귀식 기울기, Delta파 비율, Wake/Sleep 확률값, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
+                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, volumeLevel, soundDelay, gradient, deltaByTotalPS, expValue, result[0], result[2], result[4], result[6]};
+
+                    try {
+                        readThread.mBackHandler.sendMessage(msg);
+                    } catch (IllegalStateException ise) {
+                        mLogger.error(Arrays.toString(ise.getStackTrace()));
+                    }
                 }
 
                 txtMonitoring.append("Delta파의 비율 = " + String.format("%.2f", deltaByTotalPS*100) + "%\n");
@@ -504,7 +557,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         }
     }
 
-    public void freqFBProcess(int typeOfSleepStage, double expValue) {
+    public void freqFBProcess(int typeOfSleepStage, double expValue, double[] result, double gradient) {
 
         if ( typeOfSleepStage == 1 && soundDelay >= 60000 ) {          // 잠을 자는 상태이고, 딜레이가 60초가 넘으면
             txtMonitoring.append("소리 간격 피드백이 중단 되었습니다.\n");
@@ -535,12 +588,17 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 soundRunnable.setInterval(soundDelay);                                          // 바로 소리 재생 딜레이로 반영
 
                 if (switchFileRecording.isChecked()) {
-                    msg = Message.obtain(readThread.mBackHandler, 3);                        // 파일로 피드백 이벤트 기록
+                    // msg = Message.obtain(readThread.mBackHandler, 3);                        // 파일로 피드백 이벤트 기록
+                    msg = readThread.mBackHandler.obtainMessage();                        // 파일로 피드백 이벤트 기록
                     msg.what = 3;
 
-                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Wake/Sleep 확률값
-                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, volumeLevel, soundDelay, expValue};
-                    readThread.mBackHandler.sendMessage(msg);
+                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Wake/Sleep 확률값, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
+                    msg.obj = new double[]{modelSpinner.getSelectedItemPosition(), typeOfFB, feedbackChangeTime, volumeLevel, soundDelay, expValue, result[0], result[2], result[4], result[6]};
+                    try {
+                        readThread.mBackHandler.sendMessage(msg);
+                    } catch (IllegalStateException ise) {
+                        mLogger.error(Arrays.toString(ise.getStackTrace()));
+                    }
                 }
 
             } else {
@@ -607,22 +665,32 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         double[] result = calcMetrics(delta, theta, alpha, beta);
                         Log.i("Power Spectrum result", "delta=" + result[0] + ", theta=" + result[2] + ", alpha=" + result[4] + ", beta=" + result[6]);
 
-                        msg = Message.obtain();
+                        //msg = Message.obtain();
+                        msg = mHandler.obtainMessage();
                         msg.what = 2;
                         msg.arg1 = secCount;
                         msg.arg2 = inputCount;
                         msg.obj = result;
-                        mHandler.sendMessage(msg);
+                        try {
+                            mHandler.sendMessage(msg);
+                        } catch (IllegalStateException ise) {
+                            mLogger.error(Arrays.toString(ise.getStackTrace()));
+                        }
                     }
                 } else {                                                                            // 30초가 안되면 그냥 데이터 수집용 메시지만 보여주기
                     if (msg == null)
                         msg = new Message();
                     else
-                        msg = Message.obtain();
+                        //msg = Message.obtain();
+                        msg = mHandler.obtainMessage();
                     msg.what = 3;
                     msg.arg1 = secCount;
                     msg.arg2 = inputCount;
-                    mHandler.sendMessage(msg);
+                    try {
+                        mHandler.sendMessage(msg);
+                    } catch (IllegalStateException ise) {
+                        mLogger.error(Arrays.toString(ise.getStackTrace()));
+                    }
                 }
             }
 

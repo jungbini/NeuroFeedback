@@ -1,11 +1,15 @@
 package bluetoothspp.akexorcist.app.DataProcessing;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.telephony.TelephonyManager;
 import android.widget.ProgressBar;
+
+import org.apache.log4j.Logger;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -14,7 +18,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.UUID;
+
+import bluetoothspp.akexorcist.app.NeuroAnalyzer.NeuroFeedbackActivity;
+import de.mindpipe.android.logging.log4j.LogConfigurator;
+
+import static android.content.Context.MODE_PRIVATE;
 
 /**
  * Created by jungbini on 2018-03-28.
@@ -24,6 +35,9 @@ public class DataIOThread extends Thread {
 
     private Handler mMainHandler;
     public Handler mBackHandler;
+    private Logger mLogger = Logger.getLogger(DataIOThread.class);
+
+    private SharedPreferences pref;
 
     private long now = 0;
     private String str;
@@ -53,10 +67,14 @@ public class DataIOThread extends Thread {
     private int writingCount;                                       // 한 파일당 저장되는 라인수 카운터
     private DecimalFormat df = new DecimalFormat("#.###");
 
-    private SimpleDateFormat fullDateFormat = new SimpleDateFormat("MM,dd,yyyy HH:mm:ss");
+    private SimpleDateFormat fullDateFormat = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss");
     private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("MMddyyyy");
 
+    private String UUID;
+
     public DataIOThread(Handler handler, Context context) {
+
+        UUID = GetDevicesUUID(context);
 
         mMainHandler = handler;
         writingCount = 0;
@@ -73,6 +91,10 @@ public class DataIOThread extends Thread {
         if(!rawDataPath.exists()) {
             rawDataPath.mkdir();
         }
+
+        LogConfigurator logConfigurator = new LogConfigurator();            // 로그 관련 설정
+        logConfigurator.setFileName(mSdPath + "/neuro/logs/logFile.log");
+        logConfigurator.configure();
 
     }
 
@@ -162,20 +184,28 @@ public class DataIOThread extends Thread {
 
                                             // 차트 출력 모드
                                             case 0:
-                                                retmsg = Message.obtain(mMainHandler, 0);
+                                                retmsg = mMainHandler.obtainMessage();
                                                 retmsg.what = 0;
                                                 retmsg.arg1 = channel1_value;
                                                 retmsg.arg2 = channel2_value;
-                                                mMainHandler.sendMessage(retmsg);
+                                                try {
+                                                    mMainHandler.sendMessage(retmsg);
+                                                } catch (IllegalStateException ise) {
+                                                    mLogger.error(Arrays.toString(ise.getStackTrace()));
+                                                }
                                                 break;
 
                                             // FFT 변환 모드
                                             case 1:
-                                                retmsg = Message.obtain(mMainHandler, 1);
+                                                retmsg = mMainHandler.obtainMessage();
                                                 retmsg.what = 1;
                                                 retmsg.arg1 = channel1_value;
                                                 retmsg.arg2 = channel2_value;
-                                                mMainHandler.sendMessage(retmsg);
+                                                try {
+                                                    mMainHandler.sendMessage(retmsg);
+                                                } catch (IllegalStateException ise) {
+                                                    mLogger.error(Arrays.toString(ise.getStackTrace()));
+                                                }
                                                 break;
 
                                             case 2:
@@ -234,7 +264,7 @@ public class DataIOThread extends Thread {
                     now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
                     Date resultdate = new Date(now);
 
-                    rawDataFile = new File(mSdPath + "/neuro/NeuroFeedback_" + resultdate + ".txt");
+                    rawDataFile = new File(mSdPath + "/neuro/NeuroFeedback_" + UUID.substring(UUID.lastIndexOf('-')+1) + '_' + fullDateFormat.format(resultdate) + ".txt");
 
                     try {
                         if (datafos == null)
@@ -242,13 +272,18 @@ public class DataIOThread extends Thread {
 
                         String finalResult = "";
                         if (msg.obj != null) {
-                            // 보낸 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, Delta파 비율, Sleep/Wake 확률
+                            // 보낸 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, 회기식 기울기, Delta파 비율, Sleep/Wake 확률, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
                             double[] receivedLogMsg = (double[]) msg.obj;
-                            finalResult = fullDateFormat.format(resultdate) + ',' + df.format(receivedLogMsg[0]) + ',' + df.format(receivedLogMsg[1]) + ',' + df.format(receivedLogMsg[2]) + ',' +
-                                    df.format(receivedLogMsg[3]) + ',' + df.format(receivedLogMsg[4]) + ',' + df.format(receivedLogMsg[5]) + ',' +
-                                    (((receivedLogMsg[6] * 1000000) > 50.0) ? "Wake" : "Sleep") + "\n";
+
+                            // 기록할 로그: UUID, 날짜, [보낸 로그 메시지]
+                            finalResult = UUID.substring(UUID.lastIndexOf('-')+1) + ',' + fullDateFormat.format(resultdate) + ',' +
+                                    df.format(receivedLogMsg[0]) + ',' + df.format(receivedLogMsg[1]) + ',' + df.format(receivedLogMsg[2]) + ',' +
+                                    df.format(receivedLogMsg[3]) + ',' + df.format(receivedLogMsg[4]) + ',' + receivedLogMsg[5] + ',' +
+                                    df.format(receivedLogMsg[6]) + ',' + (((receivedLogMsg[7] * 1000000) > 50.0) ? "Wake" : "Sleep") + ',' +
+                                    df.format(receivedLogMsg[8]) + ',' + df.format(receivedLogMsg[9]) + ',' +
+                                    df.format(receivedLogMsg[10]) + df.format(receivedLogMsg[11]) + "\n";
                         } else {
-                            finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0,0,unknown\n";
+                            finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0,0,unknown,0,0,0,0\n";
                         }
 
                         datafos.write(finalResult.getBytes());
@@ -307,5 +342,16 @@ public class DataIOThread extends Thread {
         };
 
         Looper.loop();
+    }
+
+    private String GetDevicesUUID(Context mContext){
+        final TelephonyManager tm = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+        final String tmDevice, tmSerial, androidId;
+        tmDevice = "" + tm.getDeviceId();
+        tmSerial = "" + tm.getSimSerialNumber();
+        androidId = "" + android.provider.Settings.Secure.getString(mContext.getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+        java.util.UUID deviceUuid = new UUID(androidId.hashCode(), ((long)tmDevice.hashCode() << 32) | tmSerial.hashCode());
+        String deviceId = deviceUuid.toString();
+        return deviceId;
     }
 }
