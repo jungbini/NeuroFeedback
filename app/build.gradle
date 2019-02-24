@@ -38,4 +38,7 @@ dependencies {
     // 로깅 API
     implementation 'log4j:log4j:1.2+'
     implementation 'de.mindpipe.android:android-logging-log4j:1.0.3'
+
+    // SSL 사용을 위한 Google Play Service
+    implementation 'com.google.android.gms:play-services-auth:11.8.0'
 }

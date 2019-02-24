@@ -3,6 +3,7 @@ package bluetoothspp.akexorcist.app.NeuroAnalyzer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Environment;
@@ -15,14 +16,22 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
+import com.google.android.gms.security.ProviderInstaller;
+
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 
 public class UploadDataActivity extends Activity {
 
@@ -44,6 +53,8 @@ public class UploadDataActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_uploaddata);
+
+        initializeSSLContext(this.getApplicationContext());
 
         loadFileList();             // Neurofeedback 저장 파일 로딩하기
 
@@ -272,5 +283,20 @@ public class UploadDataActivity extends Activity {
         }
         dialog.dismiss();
         return serverResponseCode;
+    }
+
+    public static void initializeSSLContext(Context mContext){
+        try {
+            SSLContext.getInstance("TLSv1.2");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        try {
+            ProviderInstaller.installIfNeeded(mContext.getApplicationContext());
+        } catch (GooglePlayServicesRepairableException e) {
+            e.printStackTrace();
+        } catch (GooglePlayServicesNotAvailableException e) {
+            e.printStackTrace();
+        }
     }
 }

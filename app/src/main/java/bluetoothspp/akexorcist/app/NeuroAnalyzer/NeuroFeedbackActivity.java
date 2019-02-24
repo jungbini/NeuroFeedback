@@ -25,16 +25,24 @@ import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
+import com.google.android.gms.security.ProviderInstaller;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.log4j.Logger;
 import org.jtransforms.fft.DoubleFFT_1D;
 
 import java.io.File;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.locks.ReentrantLock;
+
+import javax.net.ssl.SSLContext;
 
 import app.akexorcist.bluetotohspp.library.BluetoothSPP;
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.BluetoothConnectionListener;
@@ -331,7 +339,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             alertDialog.setTitle("블루투스 연결하기");
             alertDialog.setMessage("1. 먼저 뇌파 측정 기기(Neuronicle)를 켜고, 머리에 착용합니다.\n" +
                                "2. 블루투스 연결에서 '연결' 버튼을 눌러, neuroNicle E2를 선택합니다.\n" +
-                               "3. 연결이 완료되면 뇌파 측정을 시작합니다.");
+                               "3. 연결이 완료되면 뇌파 측정을 시작합니다.\n" +
+                                "(물방울 소리가 들리지 않는다면 볼륨을 높여주세요.");
             alertDialog.show();
 
         } else {
