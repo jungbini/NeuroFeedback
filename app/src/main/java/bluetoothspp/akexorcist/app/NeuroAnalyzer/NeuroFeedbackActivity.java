@@ -10,10 +10,12 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.os.StrictMode;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -56,7 +58,6 @@ import de.mindpipe.android.logging.log4j.LogConfigurator;
 
 public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
-    private final int ANALYSIS_SECOND = 60;                         // 센서 데이터 수집 시간(초)
     private final double PS_HZ = 0.016667;                          // Power spectrum HZ
     private final ReentrantLock lock = new ReentrantLock();         // 쓰레드 lock을 위한 Util 클래스
     private Logger mLogger = Logger.getLogger(NeuroFeedbackActivity.class);
@@ -80,6 +81,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private int typeOfFB = 0;                               // 피드백 종류 (0: 소리 줄이기, 1: 간격 늘리기)
     private long soundDelay = 5000L;                       // 물방울 반복 딜레이
     private float volumeLevel = 1.0f;                      // 초기 볼륨 값
+    private float volumeChangeLevel = 0.1f;                 // 볼륨 변경 단계 (기본값 :10%)
+    private int deltaRatio = 30;                            // 수면으로 인식할 Delta파의 비율 (기본값 : 30%)
     private int feedbackChangeTime = 0;                   // 피드백을 반영하기 까지 걸릴 시간
     private int feedbackElapsedTime = 1;                 // 피드백을 주기전 경과 시간
 
@@ -104,9 +107,23 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private Timer fftTimer;
     private TimerTask runFFTTask;
 
+    private CustomApplication customApp;
+    private UploadDataActivity uploadFile;
+    private String rawFilename;
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_neurofeedback);
+
+        customApp = (CustomApplication) getApplication();               // 어플리케이션 클래스 로딩
+        uploadFile = new UploadDataActivity();
+
+        if(android.os.Build.VERSION.SDK_INT > 9) {                      // NetworkOnMainThreadException 해결
+            StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+            StrictMode.setThreadPolicy(policy);
+        }
+
+        customApp.initializeSSLContext(this.getApplicationContext());   // SSL 업로드 설정
 
         // 로그 설정
         String ext = Environment.getExternalStorageState();
@@ -265,6 +282,14 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 if (readThread != null) {
                     readThread.closeFileStream();                                   // 기록 중인 파일 스트림 중지
+
+                    if (elapsedSecond > 120) {
+                        uploadFile.uploadFileStandalong(getApplicationContext(), readThread.getRawDataFilename());             // 파일 자동 업로드
+                    } else {
+                        alertDialog.setTitle("파일 업로드");
+                        alertDialog.setMessage("뇌파 데이터를 저장하기에 부족한 시간(<2분)이므로, 파일이 업로드되지 않습니다.");
+                        alertDialog.show();
+                    }
                     readThread.interrupt();                                         // 센서 데이터 리딩 정지
                     readThread = null;
                 }
@@ -371,7 +396,6 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
     public void onClick(View v) {
         int id = v.getId();
-        Intent intent;
 
         switch(id) {
 
@@ -379,11 +403,30 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 if (btnBTConnect.getText().equals("연결")) {               // 블루투스 수신 시작
 
-                    bt.setDeviceTarget(BluetoothState.DEVICE_OTHER);
-                    intent = new Intent(getApplicationContext(), DeviceList.class);
-                    startActivityForResult(intent, BluetoothState.REQUEST_CONNECT_DEVICE);
+                    // 사용자 다이얼로그 띄우기
+                    CustomDialog dialog = new CustomDialog(this);
+                    dialog.requestWindowFeature(Window.FEATURE_CUSTOM_TITLE);
+                    dialog.setContentView(R.layout.custom_dialog);
+                    dialog.getWindow().setFeatureInt(Window.FEATURE_CUSTOM_TITLE, R.layout.custom_dialog_title);
+                    dialog.setDialogListener(new CustomDialog.CustomDialogListener() {
+                        public void onPositiveClicked(float volumeLevel, int dRatio) {
+                            volumeChangeLevel = volumeLevel;
+                            deltaRatio = dRatio;
+
+                            bt.setDeviceTarget(BluetoothState.DEVICE_OTHER);
+                            Intent intent = new Intent(getApplicationContext(), DeviceList.class);
+                            startActivityForResult(intent, BluetoothState.REQUEST_CONNECT_DEVICE);
+                        }
+
+                        @Override
+                        public void onNegativeClicked() {
+
+                        }
+                    });
+                    dialog.show();
 
                 } else if(btnBTConnect.getText().equals("연결 해제")){   // 블루투스가 동작 중이고, '블루투스 연결 해제' 버튼을 누르면, 서비스를 종료
+
                     bt.stopService();
                 }
 
@@ -475,7 +518,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                     // 모니터링 현황 알림
                     String strFeedbackTime = "피드백 " + (feedbackChangeTime - feedbackElapsedTime) + "초 남음";
-                    String infoMsg = msg.arg1 < ANALYSIS_SECOND ? "초기 데이터 수집중...(" + msg.arg1 + "초/" + ANALYSIS_SECOND + "초)" : "뇌파 분석 중...(" + msg.arg1 + "초 경과/" + strFeedbackTime + ")";
+                    String infoMsg = msg.arg1 < feedbackChangeTime ? "초기 데이터 수집중...(" + msg.arg1 + "초/" + feedbackChangeTime + "초)" : "뇌파 분석 중...(" + msg.arg1 + "초 경과/" + strFeedbackTime + ")";
 
                     inputCount = 0;                                                                 // inputCount를 다시 초기화
                     txtMonitoring.append(infoMsg + "\n");
@@ -521,19 +564,19 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                 double deltaByTotalPS = deltaPSValue / totalBrainPSValue;
 
                 if (typeOfSleepStage == 0) {                           // 잠이 깨는 중이므로 볼륨 키우기
-                    volumeLevel += 0.1;
+                    volumeLevel += volumeChangeLevel;
                     if (volumeLevel >= 1.0f)
                         volumeLevel = 1.0f;                         // 볼륨이 100%를 넘을 수 없으므로 1.0으로 고정
 
                 } else {                                            // 잠이 드는 중이므로 볼륨 줄이기
 
-                    // 볼륨이 최소 볼륨인 10%이고, delta 파의 비율이 1/3을 넘지 않으면 볼륨을 10%로 계속 유지
-                    if (volumeLevel == 0.1f && deltaByTotalPS < 33)
-                        volumeLevel = 0.1f;
+                    // 볼륨이 최소 볼륨인 10%이고, delta 파의 비율이 deltaRatio를 넘지 않으면 볼륨을 최소 volumeChangeLevel로 계속 유지
+                    if (volumeLevel == volumeChangeLevel && deltaByTotalPS < deltaRatio)
+                        volumeLevel = volumeChangeLevel;
                     else if (volumeLevel <= 0.0f)                   // 볼륨이 0%보다 낮을 수 없으므로 0.0으로 고정
                         volumeLevel = 0.0f;
                     else
-                        volumeLevel -= 0.1;
+                        volumeLevel -= volumeChangeLevel;
                 }
 
                 txtMonitoring.append("현재 볼륨 = " + String.format("%.0f", volumeLevel*100) + "\n");
@@ -623,7 +666,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             public void run() {
 
                 // 61초면 맨 앞의 센서 데이터 갯수를 가져와 해당 센서 데이터 list에서 그 갯수만큼 지우기
-                if (sensorDataCnt.size() == ANALYSIS_SECOND) {
+                if (sensorDataCnt.size() == feedbackChangeTime) {
                     lock.lock();
                     int removeDatasize = sensorDataCnt.get(0);
                     sensorDataCnt.remove(0);
@@ -634,7 +677,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 secCount++;
 
-                if (secCount >= ANALYSIS_SECOND) {
+                if (secCount >= feedbackChangeTime) {
 
                     if (bt.getServiceState() == BluetoothState.STATE_CONNECTED) {
 
@@ -648,10 +691,10 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         fft_LCh1D.realForwardFull(fft_LCh);
 
                         double realValue_l, imgValue_l, psValue_l;
-                        double [] delta = new double[230];      // (int) ((3.99-0.21)/PS_HZ)
-                        double [] theta = new double[250];
-                        double [] alpha = new double[310];
-                        double [] beta = new double[1040];
+                        double [] delta = new double[(int)((3.99-0.21)*60) + 10];      // (int) ((3.99-0.21)/PS_HZ)
+                        double [] theta = new double[(int)((7.99-3.99)*60) + 10];
+                        double [] alpha = new double[(int)((12.99-7.99)*60) + 10];
+                        double [] beta = new double[(int)((30-12.99)*60) + 10];
                         int delta_cnt = 0, theta_cnt = 0, alpha_cnt = 0, beta_cnt = 0;
 
                         for (int i = 2; i < fft_LCh.length - 1; i += 2) {

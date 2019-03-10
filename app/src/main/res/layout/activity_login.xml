@@ -48,7 +48,7 @@
                 android:layout_weight="1"
                 android:background="@drawable/main_buttonshape"
                 android:gravity="center_vertical|center_horizontal"
-                android:text="수면/뇌파\n기록 업로드"
+                android:text="수면/뇌파\n기록 조회"
                 android:textAppearance="@style/TextAppearance.AppCompat.Headline"
                 android:textColor="@android:color/background_light"
                 android:textSize="22dp" />

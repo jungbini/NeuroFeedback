@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 
 public class UploadDataActivity extends Activity {
 
@@ -106,13 +105,23 @@ public class UploadDataActivity extends Activity {
                         File target = new File(rawDataPath + "/" + uploadFileName);
                         if (target.exists()) {
                             if (target.delete()) {
-                                tView.setText("파일 삭제 완료");
-                                Toast.makeText(UploadDataActivity.this, "파일 삭제 완료",
-                                        Toast.LENGTH_SHORT).show();
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        tView.setText("파일 삭제 완료");
+                                        Toast.makeText(UploadDataActivity.this, "파일 삭제 완료",
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                });
                             } else {
-                                tView.setText("파일 삭제 실패");
-                                Toast.makeText(UploadDataActivity.this, "파일 삭제 실패",
-                                        Toast.LENGTH_SHORT).show();
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        tView.setText("파일 삭제 실패");
+                                        Toast.makeText(UploadDataActivity.this, "파일 삭제 실패",
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                });
                             }
                         }
                     }
@@ -160,6 +169,7 @@ public class UploadDataActivity extends Activity {
         List<String> filesNameList = new ArrayList<>();
         for (int i = 0 ; i < files.length ; i++) {
             if (files[i].getName().startsWith("NeuroFeedback")) {
+                // String fileName = files[i].getName().split("_")[2];
                 filesNameList.add(files[i].getName());
             }
         }
@@ -255,33 +265,146 @@ public class UploadDataActivity extends Activity {
 
         } catch (MalformedURLException ex) {
 
-            dialog.dismiss();
+            if(dialog != null)
+                dialog.dismiss();
             ex.printStackTrace();
+
+            Log.e("Upload file to server", "error: " + ex.getMessage(), ex);
 
             runOnUiThread(new Runnable() {
                 public void run() {
-                    tView.setText("MalformedURLException Exception : check script url.");
+                    if(tView != null)
+                        tView.setText("MalformedURLException Exception : check script url.");
                     Toast.makeText(UploadDataActivity.this, "MalformedURLException",
                             Toast.LENGTH_SHORT).show();
                 }
             });
 
-            Log.e("Upload file to server", "error: " + ex.getMessage(), ex);
         } catch (Exception e) {
 
-            dialog.dismiss();
+            Log.e("Upload file to server", "Exception : " + e.getMessage(), e);
+
+            if(dialog != null)
+                dialog.dismiss();
             e.printStackTrace();
 
             runOnUiThread(new Runnable() {
                 public void run() {
-                    tView.setText("Got Exception : see logcat ");
+                    if(tView != null)
+                        tView.setText("Got Exception : see logcat ");
                     Toast.makeText(UploadDataActivity.this, "Got Exception : see logcat ",
                             Toast.LENGTH_SHORT).show();
                 }
             });
-            Log.e("Upload file to server", "Exception : " + e.getMessage(), e);
         }
-        dialog.dismiss();
+        if(dialog != null)
+            dialog.dismiss();
+        return serverResponseCode;
+    }
+
+    public int uploadFileStandalong(final Context context, String sourceFileUri) {
+
+        String fileName = sourceFileUri;
+
+        HttpURLConnection conn = null;
+        DataOutputStream dos = null;
+        String lineEnd = "\r\n";
+        String twoHyphens = "--";
+        String boundary = "*****";
+        int bytesRead, bytesAvailable, bufferSize;
+        byte[] buffer;
+        int maxBufferSize = 1 * 1024 * 1024;
+        File sourceFile = new File(sourceFileUri);
+
+        try {
+
+            // open a URL connection to the Servlet
+            FileInputStream fileInputStream = new FileInputStream(sourceFile);
+            URL url = new URL(UPLOADSERVERURI);
+
+            // Open a HTTP  connection to  the URL
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setDoInput(true);                                  // Allow Inputs
+            conn.setDoOutput(true);                                 // Allow Outputs
+            conn.setUseCaches(false);                               // Don't use a Cached Copy
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Connection", "Keep-Alive");
+            conn.setRequestProperty("ENCTYPE", "multipart/form-data");
+            conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
+            conn.setRequestProperty("uploaded_file", fileName);
+
+            dos = new DataOutputStream(conn.getOutputStream());
+
+            dos.writeBytes(twoHyphens + boundary + lineEnd);
+            dos.writeBytes("Content-Disposition: form-data; name=\"uploaded_file\";filename=\"" + fileName + "\"" + lineEnd);
+            dos.writeBytes(lineEnd);
+
+            // create a buffer of  maximum size
+            bytesAvailable = fileInputStream.available();
+
+            bufferSize = Math.min(bytesAvailable, maxBufferSize);
+            buffer = new byte[bufferSize];
+
+            // read file and write it into form...
+            bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+
+            while (bytesRead > 0) {
+
+                dos.write(buffer, 0, bufferSize);
+                bytesAvailable = fileInputStream.available();
+                bufferSize = Math.min(bytesAvailable, maxBufferSize);
+                bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+
+            }
+
+            // send multipart form data necesssary after file data...
+            dos.writeBytes(lineEnd);
+            dos.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
+
+            // Responses from the server (code and message)
+            serverResponseCode = conn.getResponseCode();
+            String serverResponseMessage = conn.getResponseMessage();
+
+            Log.i("uploadFile", "HTTP Response is : "
+                    + serverResponseMessage + ": " + serverResponseCode);
+
+            if(serverResponseCode == 200){
+
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        String msg = "File Upload Completed.";
+                        Toast.makeText(context, "File Upload Complete.", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
+            //close the streams //
+            fileInputStream.close();
+            dos.flush();
+            dos.close();
+
+        } catch (MalformedURLException ex) {
+
+            ex.printStackTrace();
+            Log.e("Upload file to server", "error: " + ex.getMessage(), ex);
+
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    Toast.makeText(context, "MalformedURLException", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+        } catch (Exception e) {
+
+            Log.e("Upload file to server", "Exception : " + e.getMessage(), e);
+            e.printStackTrace();
+
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    Toast.makeText(context, "Got Exception : see logcat ", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         return serverResponseCode;
     }
 

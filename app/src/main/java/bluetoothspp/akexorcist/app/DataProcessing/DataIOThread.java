@@ -1,11 +1,16 @@
 package bluetoothspp.akexorcist.app.DataProcessing;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.telephony.TelephonyManager;
 import android.widget.ProgressBar;
 
@@ -60,6 +65,7 @@ public class DataIOThread extends Thread {
     private String ext = Environment.getExternalStorageState();     // 외부 저장소 상태
     private int hourCount;
     private File rawDataPath;
+    private String currentFileName;
     private File rawDataFile;                                       // 파일 입출력 변수
     private File fbEventFile;                                       // 피드백 이벤트 기록 파일
     private String mSdPath;
@@ -67,6 +73,7 @@ public class DataIOThread extends Thread {
     private int writingCount;                                       // 한 파일당 저장되는 라인수 카운터
     private DecimalFormat df = new DecimalFormat("#.###");
 
+    private Date resultdate;
     private SimpleDateFormat fullDateFormat = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss");
     private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("MMddyyyy");
 
@@ -91,6 +98,10 @@ public class DataIOThread extends Thread {
         if(!rawDataPath.exists()) {
             rawDataPath.mkdir();
         }
+
+        now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
+        resultdate = new Date(now);
+        currentFileName = rawDataPath + "/" + "NeuroFeedback_" + UUID.substring(UUID.lastIndexOf('-')+1) + '_' + fullDateFormat.format(resultdate) + ".txt";
 
         LogConfigurator logConfigurator = new LogConfigurator();            // 로그 관련 설정
         logConfigurator.setFileName(mSdPath + "/neuro/logs/logFile.log");
@@ -262,9 +273,9 @@ public class DataIOThread extends Thread {
                 } else if (msg.what == 3){
 
                     now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
-                    Date resultdate = new Date(now);
+                    resultdate = new Date(now);
 
-                    rawDataFile = new File(mSdPath + "/neuro/NeuroFeedback_" + UUID.substring(UUID.lastIndexOf('-')+1) + '_' + fullDateFormat.format(resultdate) + ".txt");
+                    rawDataFile = new File(currentFileName);
 
                     try {
                         if (datafos == null)
@@ -345,13 +356,28 @@ public class DataIOThread extends Thread {
     }
 
     private String GetDevicesUUID(Context mContext){
-        final TelephonyManager tm = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
-        final String tmDevice, tmSerial, androidId;
-        tmDevice = "" + tm.getDeviceId();
-        tmSerial = "" + tm.getSimSerialNumber();
-        androidId = "" + android.provider.Settings.Secure.getString(mContext.getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
-        java.util.UUID deviceUuid = new UUID(androidId.hashCode(), ((long)tmDevice.hashCode() << 32) | tmSerial.hashCode());
-        String deviceId = deviceUuid.toString();
-        return deviceId;
+        if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
+            // We do not have this permission. Let's ask the user
+            //    Activity.requestPermissions(this, new String[]{Manifest.permission.READ_PHONE_STATE}, 0);
+
+            return "imei error";
+
+        } else {
+
+            final TelephonyManager tm = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
+            final String tmDevice, tmSerial, androidId;
+            tmDevice = "" + tm.getDeviceId();
+            tmSerial = "" + tm.getSimSerialNumber();
+            androidId = "" + android.provider.Settings.Secure.getString(mContext.getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+            java.util.UUID deviceUuid = new UUID(androidId.hashCode(), ((long) tmDevice.hashCode() << 32) | tmSerial.hashCode());
+            String deviceId = deviceUuid.toString();
+            return deviceId;
+        }
     }
+
+    public String getRawDataFilename() {
+        return currentFileName;
+    }
+
 }
