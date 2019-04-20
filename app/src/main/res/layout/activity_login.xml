@@ -41,14 +41,14 @@
                 android:textStyle="bold" />
 
             <Button
-                android:id="@+id/btnSyncDB"
+                android:id="@+id/btnShowResult"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_margin="10dp"
                 android:layout_weight="1"
                 android:background="@drawable/main_buttonshape"
                 android:gravity="center_vertical|center_horizontal"
-                android:text="수면/뇌파\n기록 조회"
+                android:text="수면 뇌파\n기록 조회\n(Web)"
                 android:textAppearance="@style/TextAppearance.AppCompat.Headline"
                 android:textColor="@android:color/background_light"
                 android:textSize="22dp" />

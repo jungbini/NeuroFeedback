@@ -25,6 +25,8 @@ public class LoginActivity extends Activity implements OnClickListener {
 
     BluetoothSPP bt;
 
+    private AlertDialog.Builder alertDialog;
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
@@ -36,7 +38,7 @@ public class LoginActivity extends Activity implements OnClickListener {
         btnNeuroFeedback.requestFocus();
         btnNeuroFeedback.setOnClickListener(this);
 
-        Button btnUploadData = (Button) findViewById(R.id.btnSyncDB);
+        Button btnUploadData = (Button) findViewById(R.id.btnShowResult);
         btnUploadData.setOnClickListener(this);
 
         bt = new BluetoothSPP(this);
@@ -46,6 +48,14 @@ public class LoginActivity extends Activity implements OnClickListener {
                     , Toast.LENGTH_LONG).show();
             finish();
         }
+
+        alertDialog = new AlertDialog.Builder(this);
+        alertDialog.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                dialogInterface.dismiss();
+            }
+        });
     }
 
     public void onClick(View v) {
@@ -66,11 +76,14 @@ public class LoginActivity extends Activity implements OnClickListener {
                 startActivity(intent);
                 break;
 
-            case R.id.btnSyncDB:
+            case R.id.btnShowResult:
 
-                intent = new Intent(getApplicationContext(), UploadDataActivity.class);
-                startActivity(intent);
-                break;
+                alertDialog.setTitle("수면 뇌파 기록 조회");
+                alertDialog.setMessage("서비스 준비 중입니다...");
+                alertDialog.show();
+//                intent = new Intent(getApplicationContext(), UploadDataActivity.class);
+//                startActivity(intent);
+//                break;
 
         }
     }

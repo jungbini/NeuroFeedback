@@ -1,36 +1,24 @@
 package bluetoothspp.akexorcist.app.DataProcessing;
 
-import android.Manifest;
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.os.Build;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.telephony.TelephonyManager;
-import android.widget.ProgressBar;
+import android.util.Log;
+import android.widget.Toast;
 
 import org.apache.log4j.Logger;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.UUID;
 
-import bluetoothspp.akexorcist.app.NeuroAnalyzer.NeuroFeedbackActivity;
-import de.mindpipe.android.logging.log4j.LogConfigurator;
-
-import static android.content.Context.MODE_PRIVATE;
+import bluetoothspp.akexorcist.app.NeuroAnalyzer.GlobalApplication;
 
 /**
  * Created by jungbini on 2018-03-28.
@@ -42,86 +30,36 @@ public class DataIOThread extends Thread {
     public Handler mBackHandler;
     private Logger mLogger = Logger.getLogger(DataIOThread.class);
 
-    private SharedPreferences pref;
-
     private long now = 0;
     private String str;
     private byte[] data;
     private boolean sync_after = false;
     private byte packet_tx_index;             // 패킷 수신 인덱스
     private byte data_prev = 0;                // 직전 값
-
     private byte PUD0 = 0;
     private byte CRD_PUD2_PCDT = 0;
     private byte PUD1 = 0;
     private byte packetCount = 0;
     private byte packetCyclicData = 0;
     private byte psd_idx = 0;
-
     private byte[] packetStreamData = new byte[4];
 
     private Message retmsg;
 
-    private String ext = Environment.getExternalStorageState();     // 외부 저장소 상태
-    private int hourCount;
-    private File rawDataPath;
-    private String currentFileName;
-    private File rawDataFile;                                       // 파일 입출력 변수
-    private File fbEventFile;                                       // 피드백 이벤트 기록 파일
-    private String mSdPath;
-    private FileOutputStream datafos, eventfos;
-    private int writingCount;                                       // 한 파일당 저장되는 라인수 카운터
-    private DecimalFormat df = new DecimalFormat("#.###");
-
-    private Date resultdate;
-    private SimpleDateFormat fullDateFormat = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss");
-    private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("MMddyyyy");
-
+    private URL url;
     private String UUID;
 
     public DataIOThread(Handler handler, Context context) {
 
-        UUID = GetDevicesUUID(context);
+        UUID = GlobalApplication.GetDevicesUUID(context);
 
         mMainHandler = handler;
-        writingCount = 0;
-        hourCount = 0;
 
-        context.getApplicationContext();
-
-        if(ext.equals(Environment.MEDIA_MOUNTED))
-            mSdPath = Environment.getExternalStorageDirectory().getAbsolutePath();
-        else
-            mSdPath = Environment.MEDIA_UNMOUNTED;
-
-        rawDataPath = new File(mSdPath + "/neuro");
-        if(!rawDataPath.exists()) {
-            rawDataPath.mkdir();
-        }
-
-        now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
-        resultdate = new Date(now);
-        currentFileName = rawDataPath + "/" + "NeuroFeedback_" + UUID.substring(UUID.lastIndexOf('-')+1) + '_' + fullDateFormat.format(resultdate) + ".txt";
-
-        LogConfigurator logConfigurator = new LogConfigurator();            // 로그 관련 설정
-        logConfigurator.setFileName(mSdPath + "/neuro/logs/logFile.log");
-        logConfigurator.configure();
-
-    }
-
-    public void closeFileStream() {
         try {
-            if (datafos != null) {
-                datafos.flush();
-                datafos.close();
-            }
-
-            if (eventfos != null) {
-                eventfos.flush();
-                eventfos.close();
-            }
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
+            url = new URL("https://" + GlobalApplication.IP_ADDRESS + "insert.php");
+        } catch(MalformedURLException mue) {
+            Toast.makeText(context, "서버의 주소가 올바르지 않습니다.", Toast.LENGTH_SHORT).show();
+            Log.e("Neuro 데이터 전송", "서버의 주소가 올바르지 않습니다.");
         }
     }
 
@@ -193,18 +131,18 @@ public class DataIOThread extends Thread {
 
                                         switch (msg.what) {
 
-                                            // 차트 출력 모드
-                                            case 0:
-                                                retmsg = mMainHandler.obtainMessage();
-                                                retmsg.what = 0;
-                                                retmsg.arg1 = channel1_value;
-                                                retmsg.arg2 = channel2_value;
-                                                try {
-                                                    mMainHandler.sendMessage(retmsg);
-                                                } catch (IllegalStateException ise) {
-                                                    mLogger.error(Arrays.toString(ise.getStackTrace()));
-                                                }
-                                                break;
+//                                            // 차트 출력 모드
+//                                            case 0:
+//                                                retmsg = mMainHandler.obtainMessage();
+//                                                retmsg.what = 0;
+//                                                retmsg.arg1 = channel1_value;
+//                                                retmsg.arg2 = channel2_value;
+//                                                try {
+//                                                    mMainHandler.sendMessage(retmsg);
+//                                                } catch (IllegalStateException ise) {
+//                                                    mLogger.error(Arrays.toString(ise.getStackTrace()));
+//                                                }
+//                                                break;
 
                                             // FFT 변환 모드
                                             case 1:
@@ -218,50 +156,6 @@ public class DataIOThread extends Thread {
                                                     mLogger.error(Arrays.toString(ise.getStackTrace()));
                                                 }
                                                 break;
-
-                                            case 2:
-                                                now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
-                                                rawDataFile = new File(mSdPath + "/neuro/RAWdata_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
-
-                                                try {
-                                                    datafos = new FileOutputStream(rawDataFile, true);
-                                                    Thread.sleep(300);
-                                                } catch (FileNotFoundException fnfe) {
-                                                    fnfe.printStackTrace();
-                                                } catch (InterruptedException ie) {
-                                                    ie.printStackTrace();
-                                                }
-
-                                                //                                            str = "" + now + '|' + channel1_value + "|" + channel2_value + '\n';
-                                                str = "" + channel1_value + '\n';
-
-                                                // 파일로 기록하기
-                                                try {
-                                                    if (writingCount > 450000) {                      // 45만줄이면 약 30분 가량의 데이터 {
-                                                        datafos.close();
-
-                                                        hourCount++;                                    // 1시간이 지남
-
-                                                        rawDataFile = new File(mSdPath + "/neuro/RAWdata_"  + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
-                                                        try {
-                                                            datafos = new FileOutputStream(rawDataFile, true);
-                                                            Thread.sleep(300);
-                                                        } catch (FileNotFoundException fnfe) {
-                                                            fnfe.printStackTrace();
-                                                        } catch (InterruptedException ie) {
-                                                            ie.printStackTrace();
-                                                        } finally {
-                                                            writingCount = 0;
-                                                        }
-                                                    } else {
-                                                        writingCount++;
-                                                        datafos.write(str.getBytes());
-                                                    }
-                                                } catch (IOException ioe) {
-                                                    ioe.printStackTrace();
-                                                }
-
-                                                break;
                                         }
 
                                     }
@@ -272,81 +166,141 @@ public class DataIOThread extends Thread {
 
                 } else if (msg.what == 3){
 
-                    now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
-                    resultdate = new Date(now);
+                    double params[] = (double[]) msg.obj;
 
-                    rawDataFile = new File(currentFileName);
+                    String uuid             = UUID.substring(UUID.lastIndexOf('-')+1);
+                    String fbinterval       = String.valueOf(params[0]);
+                    String volume           = String.valueOf(params[1]);
+                    String soundinterval    = String.valueOf(params[2]);
+                    String slope            = String.valueOf(params[3]);
+                    String rateDelta        = String.valueOf(params[4]);
+                    String probwakesleep    = String.valueOf(params[5]);
+                    String deltaps          = String.valueOf(params[6]);
+                    String thetaps          = String.valueOf(params[7]);
+                    String alphaps          = String.valueOf(params[8]);
+                    String betaps           = String.valueOf(params[9]);
+
+                    String postParameters = "uuid=" + uuid + "&fbinterval=" + fbinterval +
+                            "&volume=" + volume + "&soundinterval=" + soundinterval +
+                            "&slope=" + slope + "&rateDelta=" + rateDelta +
+                            "&probwakesleep=" + probwakesleep + "&deltaps=" + deltaps +
+                            "&thetaps=" + thetaps + "&alphaps=" + alphaps +
+                            "&betaps=" + betaps;
+                    Log.d("Neuro 데이터 전송", postParameters);
 
                     try {
-                        if (datafos == null)
-                            datafos = new FileOutputStream(rawDataFile, true);
+                        HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
 
-                        String finalResult = "";
-                        if (msg.obj != null) {
-                            // 보낸 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, 회기식 기울기, Delta파 비율, Sleep/Wake 확률, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
-                            double[] receivedLogMsg = (double[]) msg.obj;
+                        httpURLConnection.setReadTimeout(5000);
+                        httpURLConnection.setConnectTimeout(5000);
+                        httpURLConnection.setRequestMethod("POST");
+                        httpURLConnection.connect();
 
-                            // 기록할 로그: UUID, 날짜, [보낸 로그 메시지]
-                            finalResult = UUID.substring(UUID.lastIndexOf('-')+1) + ',' + fullDateFormat.format(resultdate) + ',' +
-                                    df.format(receivedLogMsg[0]) + ',' + df.format(receivedLogMsg[1]) + ',' + df.format(receivedLogMsg[2]) + ',' +
-                                    df.format(receivedLogMsg[3]) + ',' + df.format(receivedLogMsg[4]) + ',' + receivedLogMsg[5] + ',' +
-                                    df.format(receivedLogMsg[6]) + ',' + (((receivedLogMsg[7] * 1000000) > 50.0) ? "Wake" : "Sleep") + ',' +
-                                    df.format(receivedLogMsg[8]) + ',' + df.format(receivedLogMsg[9]) + ',' +
-                                    df.format(receivedLogMsg[10]) + df.format(receivedLogMsg[11]) + "\n";
+                        OutputStream outputStream = httpURLConnection.getOutputStream();
+                        outputStream.write(postParameters.getBytes("UTF-8"));
+                        outputStream.flush();
+                        outputStream.close();
+
+                        int responseStatusCode = httpURLConnection.getResponseCode();
+                        Log.d("Neuro 데이터 전송", "Post response code - " + responseStatusCode);
+
+                        InputStream inputStream;
+                        if(responseStatusCode == HttpURLConnection.HTTP_OK) {
+                            inputStream = httpURLConnection.getInputStream();
                         } else {
-                            finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0,0,unknown,0,0,0,0\n";
+                            inputStream = httpURLConnection.getErrorStream();
                         }
 
-                        datafos.write(finalResult.getBytes());
-                        datafos.flush();
+                        InputStreamReader inputStreamReader =  new InputStreamReader(inputStream, "UTF-8");
+                        BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
 
-                    } catch (FileNotFoundException fnfe) {
-                        fnfe.printStackTrace();
+                        StringBuilder sb = new StringBuilder();
+                        String line = null;
+
+                        while((line = bufferedReader.readLine()) != null) {
+                            sb.append(line);
+                        }
+
+                        bufferedReader.close();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        Log.d("Neuro 데이터 전송", "InsertData: Error ", e);
                     }
 
-                } else if (msg.what == 4) {                                 // 피드백 이벤트 로그 기록하기
+//                    now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
+//                    resultdate = new Date(now);
+//
+//                    rawDataFile = new File(currentFileName);
+//
+//                    try {
+//                        if (datafos == null)
+//                            datafos = new FileOutputStream(rawDataFile, true);
+//
+//                        String finalResult = "";
+//                        if (msg.obj != null) {
+//                            // 보낸 로그 메시지: 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, 회기식 기울기, Delta파 비율, Sleep/Wake 확률, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
+//                            double[] receivedLogMsg = (double[]) msg.obj;
+//
+//                            // 기록할 로그: UUID, 날짜, [보낸 로그 메시지]
+//                            finalResult = UUID.substring(UUID.lastIndexOf('-')+1) + ',' + fullDateFormat.format(resultdate) + ',' +
+//                                    df.format(receivedLogMsg[0]) + ',' + df.format(receivedLogMsg[1]) + ',' +
+//                                    df.format(receivedLogMsg[2]) + ',' + df.format(receivedLogMsg[3]) + ',' + receivedLogMsg[4] + ',' +
+//                                    df.format(receivedLogMsg[5]) + ',' + (((receivedLogMsg[6] * 1000000) > 50.0) ? "Wake" : "Sleep") + ',' +
+//                                    df.format(receivedLogMsg[7]) + ',' + df.format(receivedLogMsg[8]) + ',' +
+//                                    df.format(receivedLogMsg[9]) + df.format(receivedLogMsg[10]) + "\n";
+//                        } else {
+//                            finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0,unknown,0,0,0,0\n";
+//                        }
+//
+//                        datafos.write(finalResult.getBytes());
+//                        datafos.flush();
+//
+//                    } catch (FileNotFoundException fnfe) {
+//                        fnfe.printStackTrace();
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
 
-                    now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
-                    Date resultdate = new Date(now);
-
-                    try {
-                        fbEventFile = new File(mSdPath + "/neuro/FeedbackEvent_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
-                        eventfos = new FileOutputStream(fbEventFile, true);
-                        Thread.sleep(300);
-
-                        if (writingCount > 450000) {                      // 45만줄이면 약 30분 가량의 데이터 {
-                            if (eventfos != null)
-                                eventfos.close();
-                            hourCount++;                                    // 30분이 지남
-
-                            fbEventFile = new File(mSdPath + "/neuro/FeedbackEvent_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
-                            eventfos = new FileOutputStream(fbEventFile, true);
-                            Thread.sleep(300);
-
-                        } else {
-
-                            String finalResult = "";
-                            if (msg.obj != null) {
-                                double[] tmpResults = (double[]) msg.obj;
-                                finalResult = fullDateFormat.format(resultdate) + ',' + df.format(tmpResults[0]) + ',' + df.format(tmpResults[1]) + ',' + df.format(tmpResults[2]) + ',' +
-                                        df.format(tmpResults[3]) + ',' + df.format(tmpResults[4]) + ',' + df.format(tmpResults[5]) + "\n";
-                            } else {
-                                finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0\n";
-                            }
-
-                            if (eventfos != null) {
-                                eventfos.write(finalResult.getBytes());
-                            }
-                        }
-
-                    } catch (IOException ioe) {
-                        ioe.printStackTrace();
-                    } catch (InterruptedException ie) {
-                        ie.printStackTrace();
-                    }
-
+//                } else if (msg.what == 4) {                                 // 피드백 이벤트 로그 기록하기
+//
+//                    now = System.currentTimeMillis();                          // 현재시간을 msec 으로 구한다.
+//                    Date resultdate = new Date(now);
+//
+//                    try {
+//                        fbEventFile = new File(mSdPath + "/neuro/FeedbackEvent_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
+//                        eventfos = new FileOutputStream(fbEventFile, true);
+//                        Thread.sleep(300);
+//
+//                        if (writingCount > 450000) {                      // 45만줄이면 약 30분 가량의 데이터 {
+//                            if (eventfos != null)
+//                                eventfos.close();
+//                            hourCount++;                                    // 30분이 지남
+//
+//                            fbEventFile = new File(mSdPath + "/neuro/FeedbackEvent_" + simpleDateFormat.format(now) + '_' + hourCount + ".txt");
+//                            eventfos = new FileOutputStream(fbEventFile, true);
+//                            Thread.sleep(300);
+//
+//                        } else {
+//
+//                            String finalResult = "";
+//                            if (msg.obj != null) {
+//                                double[] tmpResults = (double[]) msg.obj;
+//                                finalResult = fullDateFormat.format(resultdate) + ',' + df.format(tmpResults[0]) + ',' + df.format(tmpResults[1]) + ',' + df.format(tmpResults[2]) + ',' +
+//                                        df.format(tmpResults[3]) + ',' + df.format(tmpResults[4]) + ',' + df.format(tmpResults[5]) + "\n";
+//                            } else {
+//                                finalResult = fullDateFormat.format(resultdate) + ",0,0,0,0,0,0\n";
+//                            }
+//
+//                            if (eventfos != null) {
+//                                eventfos.write(finalResult.getBytes());
+//                            }
+//                        }
+//
+//                    } catch (IOException ioe) {
+//                        ioe.printStackTrace();
+//                    } catch (InterruptedException ie) {
+//                        ie.printStackTrace();
+//                    }
+//
                 }
 
             }
@@ -354,30 +308,4 @@ public class DataIOThread extends Thread {
 
         Looper.loop();
     }
-
-    private String GetDevicesUUID(Context mContext){
-        if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.READ_PHONE_STATE)
-                != PackageManager.PERMISSION_GRANTED) {
-            // We do not have this permission. Let's ask the user
-            //    Activity.requestPermissions(this, new String[]{Manifest.permission.READ_PHONE_STATE}, 0);
-
-            return "imei error";
-
-        } else {
-
-            final TelephonyManager tm = (TelephonyManager) mContext.getSystemService(Context.TELEPHONY_SERVICE);
-            final String tmDevice, tmSerial, androidId;
-            tmDevice = "" + tm.getDeviceId();
-            tmSerial = "" + tm.getSimSerialNumber();
-            androidId = "" + android.provider.Settings.Secure.getString(mContext.getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
-            java.util.UUID deviceUuid = new UUID(androidId.hashCode(), ((long) tmDevice.hashCode() << 32) | tmSerial.hashCode());
-            String deviceId = deviceUuid.toString();
-            return deviceId;
-        }
-    }
-
-    public String getRawDataFilename() {
-        return currentFileName;
-    }
-
 }

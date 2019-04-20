@@ -1,4 +1,4 @@
-package bluetoothspp.akexorcist.app.NeuroAnalyzer;
+package bluetoothspp.akexorcist.app.Util;
 
 import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.formatter.IAxisValueFormatter;

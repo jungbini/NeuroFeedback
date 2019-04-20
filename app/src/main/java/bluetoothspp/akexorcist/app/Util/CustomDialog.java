@@ -1,4 +1,4 @@
-package bluetoothspp.akexorcist.app.NeuroAnalyzer;
+package bluetoothspp.akexorcist.app.Util;
 
 import android.app.Dialog;
 import android.content.Context;
@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.RadioGroup;
+
+import bluetoothspp.akexorcist.app.NeuroAnalyzer.R;
 
 public class CustomDialog extends Dialog implements View.OnClickListener {
     private float volumeChangeLevel = 0.1f;
@@ -23,7 +25,7 @@ public class CustomDialog extends Dialog implements View.OnClickListener {
         this.context = context;
     }
 
-    interface CustomDialogListener {
+    public interface CustomDialogListener {
         void onPositiveClicked(float volumeUnit, int deltaRatio);
         void onNegativeClicked();
     }

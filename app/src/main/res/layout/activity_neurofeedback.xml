@@ -28,243 +28,11 @@
                 android:layout_height="wrap_content">
 
                 <LinearLayout
-                    android:id="@+id/tabMain"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/txtBluetooth"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:gravity="left|center_vertical"
-                        android:paddingLeft="10dp"
-                        android:text="1. 블루투스 연결"
-                        android:textSize="20dp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:id="@+id/layoutConnect"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <Button
-                            android:id="@+id/btnBTConnect"
-                            android:layout_width="200dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="5dp"
-                            android:layout_marginRight="5dp"
-                            android:layout_weight="1"
-                            android:text="연결"
-                            android:textSize="15dp" />
-
-                        <TextView
-                            android:id="@+id/textBTStatus"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:focusable="false"
-                            android:gravity="left|center_vertical"
-                            android:text="연결 상태 : 연결되지 않음"
-                            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-                            android:textSize="15dp" />
-
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/txtStatus"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="10dp"
-                        android:layout_weight="1"
-                        android:gravity="left|center_vertical"
-                        android:paddingLeft="10dp"
-                        android:text="2. 수면 상태"
-                        android:textSize="20dp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:id="@+id/layoutSleepStage"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginBottom="5dp"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/lblSleepStage"
-                            android:layout_width="100dp"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:gravity="left|center_vertical"
-                            android:paddingLeft="10dp"
-                            android:text="수면 상태"
-                            android:textAllCaps="false"
-                            android:textSize="15dp" />
-
-                        <EditText
-                            android:id="@+id/tboxSleepStage"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/rectangletextview"
-                            android:ems="10"
-                            android:focusable="false"
-                            android:inputType="textPersonName"
-                            android:paddingLeft="10dp"
-                            android:selectAllOnFocus="false"
-                            android:singleLine="false"
-                            android:text="Wake"
-                            android:textAppearance="@style/TextAppearance.AppCompat"
-                            android:textColor="@android:color/holo_blue_light"
-                            android:textSize="15dp"
-                            tools:text="Wake" />
-
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/layoutModelValue"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginBottom="5dp"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/lblModelValue"
-                            android:layout_width="100dp"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:gravity="left|center_vertical"
-                            android:paddingLeft="10dp"
-                            android:text="수면 측정  값(%)"
-                            android:textAllCaps="false"
-                            android:textSize="15dp" />
-
-                        <EditText
-                            android:id="@+id/tboxModelValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/rectangletextview"
-                            android:ems="10"
-                            android:focusable="false"
-                            android:inputType="textPersonName"
-                            android:paddingLeft="10dp"
-                            android:text="0"
-                            android:textColor="@android:color/holo_blue_light"
-                            android:textSize="15dp" />
-
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/layoutRegression"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginBottom="5dp"
-                        android:layout_weight="1"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/lblRegressionResult"
-                            android:layout_width="100dp"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:gravity="left|center_vertical"
-                            android:paddingLeft="10dp"
-                            android:text="Alpha/Theta 기울기"
-                            android:textAllCaps="false"
-                            android:textSize="15dp" />
-
-                        <EditText
-                            android:id="@+id/tboxRegressionResult"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/rectangletextview"
-                            android:ems="10"
-                            android:focusable="false"
-                            android:inputType="textPersonName"
-                            android:paddingLeft="10dp"
-                            android:text="0"
-                            android:textColor="@android:color/holo_blue_light"
-                            android:textSize="15dp" />
-
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:id="@+id/imageView"
-                            android:layout_width="match_parent"
-                            android:layout_height="200dp"
-                            android:layout_gravity="center"
-                            android:layout_marginLeft="10dp"
-                            android:layout_marginTop="10dp"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:background="@color/Darkholo"
-                            android:visibility="visible" />
-
-                    </LinearLayout>
-
-
-                </LinearLayout>
-
-                <LinearLayout
                     android:id="@+id/tabSetting"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="top"
                     android:orientation="vertical">
-
-                    <LinearLayout
-                        android:id="@+id/select_model"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:layout_alignParentTop="true"
-                        android:layout_weight="1"
-                        android:gravity="top"
-                        android:orientation="horizontal"
-                        android:paddingTop="10dp"
-                        android:visibility="visible">
-
-                        <TextView
-                            android:id="@+id/txtModelSelection"
-                            android:layout_width="60dp"
-                            android:layout_height="40dp"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:gravity="left|center_vertical"
-                            android:paddingLeft="10dp"
-                            android:text="수면예측 모델 선택"
-                            android:textAllCaps="false"
-                            android:textSize="15dp" />
-
-                        <Spinner
-                            android:id="@+id/spnModelSelection"
-                            android:layout_width="wrap_content"
-                            android:layout_height="40dp"
-                            android:layout_marginRight="10dp"
-                            android:layout_weight="1"
-                            android:ems="10"
-                            android:gravity="left"
-                            android:textColor="@android:color/background_dark"
-                            android:textSize="20dp"></Spinner>
-
-                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/feedback_method"
@@ -494,64 +262,200 @@
 
                     </LinearLayout>
 
-                    <LinearLayout
-                        android:id="@+id/LayoutSimulation"
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/tabMain"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/txtBluetooth"
                         android:layout_width="match_parent"
                         android:layout_height="40dp"
                         android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:paddingTop="10dp">
+                        android:gravity="left|center_vertical"
+                        android:paddingLeft="10dp"
+                        android:text="1. 블루투스 연결"
+                        android:textSize="20dp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutConnect"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnBTConnect"
+                            android:layout_width="200dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginLeft="5dp"
+                            android:layout_marginRight="5dp"
+                            android:layout_weight="1"
+                            android:text="연결"
+                            android:textSize="15dp" />
 
                         <TextView
-                            android:id="@+id/txtSimulation"
-                            android:layout_width="wrap_content"
-                            android:layout_height="40dp"
+                            android:id="@+id/textBTStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:focusable="false"
+                            android:gravity="left|center_vertical"
+                            android:text="연결 상태 : 연결되지 않음"
+                            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                            android:textSize="15dp" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/txtStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="10dp"
+                        android:layout_weight="1"
+                        android:gravity="left|center_vertical"
+                        android:paddingLeft="10dp"
+                        android:text="2. 수면 상태"
+                        android:textSize="20dp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutSleepStage"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="5dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/lblSleepStage"
+                            android:layout_width="100dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
                             android:layout_weight="1"
                             android:gravity="left|center_vertical"
                             android:paddingLeft="10dp"
-                            android:text="시뮬레이션"
+                            android:text="수면 상태"
+                            android:textAllCaps="false"
                             android:textSize="15dp" />
 
-                        <RadioGroup
-                            android:id="@+id/rgSimulation"
+                        <EditText
+                            android:id="@+id/tboxSleepStage"
                             android:layout_width="wrap_content"
-                            android:layout_height="40dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
                             android:layout_weight="1"
-                            android:orientation="horizontal">
+                            android:background="@drawable/rectangletextview"
+                            android:ems="10"
+                            android:focusable="false"
+                            android:inputType="textPersonName"
+                            android:paddingLeft="10dp"
+                            android:selectAllOnFocus="false"
+                            android:singleLine="false"
+                            android:text="Wake"
+                            android:textAppearance="@style/TextAppearance.AppCompat"
+                            android:textColor="@android:color/holo_blue_light"
+                            android:textSize="15dp"
+                            tools:text="Wake" />
 
-                            <RadioButton
-                                android:id="@+id/rbtnNoSimulation"
-                                android:layout_width="wrap_content"
-                                android:layout_height="40dp"
-                                android:layout_weight="1"
-                                android:checked="true"
-                                android:gravity="left|fill_vertical"
-                                android:text="안함"
-                                android:textSize="15dp" />
-
-                            <RadioButton
-                                android:id="@+id/rbtnSleepMode"
-                                android:layout_width="wrap_content"
-                                android:layout_height="40dp"
-                                android:layout_weight="1"
-                                android:clickable="false"
-                                android:enabled="false"
-                                android:gravity="left|fill_vertical"
-                                android:text="졸림"
-                                android:textSize="15dp" />
-
-                            <RadioButton
-                                android:id="@+id/rbtnWakeMode"
-                                android:layout_width="wrap_content"
-                                android:layout_height="40dp"
-                                android:layout_weight="1"
-                                android:enabled="false"
-                                android:gravity="left|fill_vertical"
-                                android:text="깸"
-                                android:textSize="15dp" />
-
-                        </RadioGroup>
                     </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/layoutModelValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="5dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/lblModelValue"
+                            android:layout_width="100dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="수면 측정  값(%)"
+                            android:textAllCaps="false"
+                            android:textSize="15dp" />
+
+                        <EditText
+                            android:id="@+id/tboxModelValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/rectangletextview"
+                            android:ems="10"
+                            android:focusable="false"
+                            android:inputType="textPersonName"
+                            android:paddingLeft="10dp"
+                            android:text="0"
+                            android:textColor="@android:color/holo_blue_light"
+                            android:textSize="15dp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/layoutRegression"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="5dp"
+                        android:layout_weight="1"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/lblRegressionResult"
+                            android:layout_width="100dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:gravity="left|center_vertical"
+                            android:paddingLeft="10dp"
+                            android:text="Alpha/Theta 기울기"
+                            android:textAllCaps="false"
+                            android:textSize="15dp" />
+
+                        <EditText
+                            android:id="@+id/tboxRegressionResult"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/rectangletextview"
+                            android:ems="10"
+                            android:focusable="false"
+                            android:inputType="textPersonName"
+                            android:paddingLeft="10dp"
+                            android:text="0"
+                            android:textColor="@android:color/holo_blue_light"
+                            android:textSize="15dp" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/imageView"
+                            android:layout_width="match_parent"
+                            android:layout_height="200dp"
+                            android:layout_gravity="center"
+                            android:layout_marginLeft="10dp"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="1"
+                            android:background="@color/Darkholo"
+                            android:visibility="visible" />
+
+                    </LinearLayout>
+
 
                 </LinearLayout>
 

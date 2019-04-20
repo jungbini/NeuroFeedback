@@ -20,6 +20,7 @@ import app.akexorcist.bluetotohspp.library.DeviceList;
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.BluetoothConnectionListener;
 import app.akexorcist.bluetotohspp.library.BluetoothSPP.OnDataReceivedListener;
 import bluetoothspp.akexorcist.app.DataProcessing.DataIOThread;
+import bluetoothspp.akexorcist.app.Util.MyXAxisValueFormatter;
 
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
