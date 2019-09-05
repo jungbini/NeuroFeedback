@@ -10,6 +10,7 @@ import android.widget.Toast;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -189,6 +190,7 @@ public class DataIOThread extends Thread {
                     Log.d("Neuro 데이터 전송", postParameters);
 
                     try {
+
                         HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();
 
                         httpURLConnection.setReadTimeout(5000);

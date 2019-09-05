@@ -43,6 +43,7 @@ import app.akexorcist.bluetotohspp.library.BluetoothSPP.OnDataReceivedListener;
 import app.akexorcist.bluetotohspp.library.BluetoothState;
 import app.akexorcist.bluetotohspp.library.DeviceList;
 import bluetoothspp.akexorcist.app.DataProcessing.DataIOThread;
+import bluetoothspp.akexorcist.app.RegressionAnalysis.LinearRegression;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.LinearRegressionModel;
 import bluetoothspp.akexorcist.app.RegressionAnalysis.RegressionModel;
 import bluetoothspp.akexorcist.app.Util.CustomDialog;
@@ -50,7 +51,7 @@ import bluetoothspp.akexorcist.app.Util.SoundRunnable;
 
 public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
-    private final double PS_HZ = 0.016667;                          // Power spectrum HZ
+    private double PS_HZ = 0.2;                          // Power spectrum HZ
 
     private String UUID = null;
     private Logger mLogger = Logger.getLogger(NeuroFeedbackActivity.class);
@@ -70,12 +71,12 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
     private double fftLChInputs [];                       // FFT 계산을 위한 Channel raw data 배열 변수
     private int secCount = -1;                              // 30초 초기화 과정을 위한 카운터
     private int typeOfFB = 0;                               // 피드백 종류 (0: 소리 줄이기, 1: 간격 늘리기)
-    private long soundDelay = 5000L;                       // 물방울 반복 딜레이
+    private long soundDelay = 10000L;                       // 물방울 반복 딜레이
     private float volumeLevel = 0.7f;                      // 초기 볼륨 값
-    private float volumeChangeLevel = 0.1f;                 // 볼륨 변경 단계 (기본값 :10%)
-    private int deltaRatio = 30;                            // 수면으로 인식할 Delta파의 비율 (기본값 : 30%)
+    private float volumeChangeLevel = 0.02f;                 // 볼륨 변경 단계 (기본값 :2%)
     private int feedbackChangeTime = 0;                   // 피드백을 반영하기 까지 걸릴 시간
     private int feedbackElapsedTime = 1;                 // 피드백을 주기전 경과 시간
+    private int negativeGradientCnt = 0;
 
     // UI 변수
     private TextView txtBTStatus, txtMonitoring, fbChnageTerm;
@@ -361,6 +362,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 if (btnBTConnect.getText().equals("연결")) {               // 블루투스 수신 시작
 
+                    /*
                     // 사용자 다이얼로그 띄우기
                     CustomDialog dialog = new CustomDialog(this);
                     //dialog.requestWindowFeature(Window.FEATURE_CUSTOM_TITLE);
@@ -382,6 +384,11 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         }
                     });
                     dialog.show();
+                    */
+
+                    bt.setDeviceTarget(BluetoothState.DEVICE_OTHER);
+                    Intent intent = new Intent(getApplicationContext(), DeviceList.class);
+                    startActivityForResult(intent, BluetoothState.REQUEST_CONNECT_DEVICE);
 
                 } else if(btnBTConnect.getText().equals("연결 해제")){   // 블루투스가 동작 중이고, '블루투스 연결 해제' 버튼을 누르면, 서비스를 종료
 
@@ -400,15 +407,37 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             switch (msg.what) {
 
                 case 1:                                                             // 센서 ReadingThread로부터 데이터를 읽어오는 핸들러
-                    sensorData.add((double) ((msg.arg1 + msg.arg2) / 2));           // Left/Right 채널 평균으로 계산
+                    if (sensorData.size() >= 1250) {
+                        sensorData.remove(0);
+                    }
+                    sensorData.add((double)((msg.arg1-16384)*24.04/1000));           // Left/Right 채널 평균으로 계산
+
+                    // Log.i("Neuro sensorData 크기: ", String.valueOf(sensorData.size()));
                     break;
 
                 case 2:                                                             // 예측 모델 회귀식이 들어갈 자리
 
+                    // 현재 볼륨 출력
+                    ((TextView)findViewById(R.id.tboxCurVolumn)).setText(String.format("%.1f", volumeLevel*100));
+
                     double [] result = (double[]) msg.obj;
+                    if (result == null) break;
+
+                    try {
+                        readThread.mBackHandler.sendMessage(msg);
+                    } catch (IllegalStateException ise) {
+                        mLogger.error(Arrays.toString(ise.getStackTrace()));
+                    }
 
                     ++elapsedSecond;                                               // xAlphaThetaArray 리스트에 넣을 초 증가
-                    xAlphaThetaArray.add(elapsedSecond);
+                    //xAlphaThetaArray.add(elapsedSecond);
+
+                    if (xAlphaThetaArray.size() >= 60) {
+                        xAlphaThetaArray.remove(0);
+                        yAlphaThetaArray.remove(0);
+                    }
+
+                    xAlphaThetaArray.add((double)feedbackElapsedTime);
                     yAlphaThetaArray.add(result[8]);
 
                     totalBrainPSValue += result[0] + result[2] + result[4] + result[6];
@@ -421,6 +450,8 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                         RegressionModel regressionModel = new LinearRegressionModel(xArray, yArray);
                         regressionModel.compute();
                         gradient = regressionModel.getCoefficients()[1];     // 기울기 가져오기
+
+                        negativeGradientCnt += gradient > 0 ? 0 : 1;        // - 기울기를 카운팅
 
                         ((TextView)findViewById(R.id.tboxRegressionResult)).setText(String.format("%.5f", gradient));
                     }
@@ -436,7 +467,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                     expValue = ( Math.exp(sleepStageClass) / (1+Math.exp(sleepStageClass)) ) * 100;
 
                     // 최종 수면 상태 값
-                    ((TextView)findViewById(R.id.tboxModelValue)).setText(String.format("%.2f", expValue));
+                    //((TextView)findViewById(R.id.tboxModelValue)).setText(String.format("%.2f", expValue));
 
                     // 수면 상태 판별
                     if (gradient != 0)
@@ -446,7 +477,27 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                     // 현재는 시뮬레이션 모드가 없으므로, Wake/Sleep 시뮬레이션 모드를 체크할 필요가 없음
                     // typeOfSleepStage = sleepStageClass > 0.5 ? 0 : 1;
-                    int typeOfSleepStage = gradient > 0 ? 0 : 1;                        // 0: Wake, 1: Sleep
+                    // int typeOfSleepStage = negativeGradientCnt < 30 ? 0 : 1;                        // 0: Wake, 1: Sleep
+                    int typeOfSleepStage = gradient >= 0 ? 0 : 1;
+
+                    /************* [임시] 매 초마다 데이터 저장 *****************/
+                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, 회귀식 기울기, Delta파 비율, Wake/Sleep 확률값, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
+
+                    //float volumeChangeDelta = negativeGradientCnt < 30 ? (float)((60-negativeGradientCnt) * 0.001) : (float)((-1 * negativeGradientCnt) * 0.001);
+                    double deltaByTotalPS = deltaPSValue / totalBrainPSValue;
+
+                    Message iomsg = readThread.mBackHandler.obtainMessage();                        // 파일로 피드백 이벤트 기록
+                    iomsg.what = 3;
+                    iomsg.obj = new double[]{feedbackChangeTime, volumeLevel, soundDelay, gradient, deltaByTotalPS, expValue, result[0], result[2], result[4], result[6]};
+                    //Log.i("Neuro data: ", "Delta: " + result[0] + ", Theta: " + result[2] + ", Alpha: " + result[4] + ", Beta: " + result[6]);
+
+                    try {
+                        readThread.mBackHandler.sendMessage(iomsg);
+                    } catch (IllegalStateException ise) {
+                        mLogger.error(Arrays.toString(ise.getStackTrace()));
+                    }
+
+                    /*********** [임시] 매 초마다 데이터 저장 *****************/
 
                     // 수면 상태에 따라 메인 이미지 바꾸기
                     if (typeOfSleepStage == 0)      imgView.setImageDrawable(wakeImg);
@@ -463,7 +514,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
                     // 모니터링 현황 알림
                     String strFeedbackTime = "피드백 " + (feedbackChangeTime - feedbackElapsedTime) + "초 남음";
                     String infoMsg = msg.arg1 < feedbackChangeTime ? "초기 데이터 수집중...(" + msg.arg1 + "초/" + feedbackChangeTime + "초)" :
-                                                                     "뇌파 분석 중...(" + msg.arg1 + "초 경과/" + strFeedbackTime + ")";
+                                                                     "뇌파 분석 중...(" + (msg.arg1/60) + "분 경과/" + strFeedbackTime + ")";
                     txtMonitoring.append(infoMsg + "\n");
 
                     break;
@@ -490,42 +541,41 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
                 if (typeOfSleepStage == 0) {                           // 잠이 깨는 중이므로 볼륨 키우기
                     volumeLevel += volumeChangeLevel;
+                    //volumeLevel += ( (60-negativeGradientCnt) * 0.001 );
+
+                    txtMonitoring.append("볼륨 상승!\n");
+
                     if (volumeLevel >= 0.7f)
                         volumeLevel = 0.7f;                         // 볼륨을 70%로 제한
 
                 } else {                                            // 잠이 드는 중이므로 볼륨 줄이기
 
-                    // 볼륨이 최소 볼륨인 10%이고, delta 파의 비율이 deltaRatio를 넘지 않으면 볼륨을 최소 volumeChangeLevel로 계속 유지
-                    if (volumeLevel == volumeChangeLevel && deltaByTotalPS < deltaRatio)
-                        volumeLevel = volumeChangeLevel;
+
+                    // 방법2: 최소 볼륨이 5%이고, wake 상태(expValue>50)이면, 볼륨을 최소 값인 5%로 계속 유지
+                    //if (volumeLevel <= 0.05f && expValue > 50)
+
+                    // 방법1: 최소 볼륨이 10%이고, delta 파의 비율이 33%를 넘지 않으면 볼륨을 최소 volumeChangeLevel로 계속 유지
+                    if (volumeLevel <= volumeChangeLevel && deltaByTotalPS < 0.33)
+                        volumeLevel = 0.05f;
                     else if (volumeLevel <= 0.0f)                   // 볼륨이 0%보다 낮을 수 없으므로 0.0으로 고정
                         volumeLevel = 0.0f;
                     else
                         volumeLevel -= volumeChangeLevel;
+                        //volumeLevel -= (negativeGradientCnt * 0.001);
+
+                    txtMonitoring.append("볼륨 감소!\n");
                 }
 
-                txtMonitoring.append("현재 볼륨 = " + String.format("%.0f", volumeLevel*100) + "\n");
                 soundRunnable.setVolume(volumeLevel);
 
                 if (switchFileRecording.isChecked()) {
-                    msg = readThread.mBackHandler.obtainMessage();                        // 파일로 피드백 이벤트 기록
-                    msg.what = 3;
-//
-                    // 기록할 로그 메시지: 예측모델 종류, 피드백 타입, 피드백 반영 시간, 볼륨 크기, 물방울 소리 간격, 회귀식 기울기, Delta파 비율, Wake/Sleep 확률값, delta PS 값, theta PS 값, alpha PS 값, beta PS 값
-                    msg.obj = new double[]{feedbackChangeTime, volumeLevel, soundDelay, gradient, deltaByTotalPS, expValue, result[0], result[2], result[4], result[6]};
-
-                    try {
-                        readThread.mBackHandler.sendMessage(msg);
-                    } catch (IllegalStateException ise) {
-                        mLogger.error(Arrays.toString(ise.getStackTrace()));
-                    }
+                    // 파일 기록 로직 넣기
                 }
-
-                txtMonitoring.append("Delta파의 비율 = " + String.format("%.2f", deltaByTotalPS*100) + "%\n");
 
                 feedbackElapsedTime = 0;                               // 경과 시간을 다시 0으로 설정
                 totalBrainPSValue = 0.0;                                // 총 뇌파 값 새로 저장
                 deltaPSValue = 0.0;                                     // 총 Theta 값 새로 저장
+                negativeGradientCnt = 0;                            // 음수 기울기 갯수 초기화
 
             } else {
                 feedbackElapsedTime++;                                 // 경과시간이 피드백 주기보다 작으면, +1
@@ -589,62 +639,54 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
             public void run() {
 
-                sensorList.add(sensorData);                                     // sensorList에 지금까지 모인 sensorData 추가하기
-                sensorData = new CopyOnWriteArrayList<>();                      // sensorData는 다시 비우기
-
                 secCount++;
 
-                if (secCount >= feedbackChangeTime) {
+                if (secCount >= 5) {                                            // 분해능 5초 간격 = 0.2Hz
 
-                    ArrayList<Double> tmpSensorData = new ArrayList<>();         // 전역변수 sensorData를 임시로 복사하여 FFT 계산
+                    if ( bt.getServiceState() == BluetoothState.STATE_CONNECTED) {
+                        double[] result = {0,0,0,0,0,0,0,0,0,0,0,0};
 
-                    sensorList.remove(0);                                   // 앞 1초 sensor data는 지우기
+                        try {
+                            //fftLChInputs = ArrayUtils.toPrimitive(tmpSensorData.toArray(new Double[tmpSensorData.size()]));
+                            fftLChInputs = ArrayUtils.toPrimitive(sensorData.toArray(new Double[sensorData.size()]));
 
-                    Log.i("Sensor List 크기", String.valueOf(sensorList.size()));
-                    for(CopyOnWriteArrayList <Double> item : sensorList) {
-                        tmpSensorData.addAll(item);
-                    }
+                            DoubleFFT_1D fft_LCh1D = new DoubleFFT_1D(fftLChInputs.length);
+                            double[] fft_LCh = new double[fftLChInputs.length * 2];
 
-                    if (bt.getServiceState() == BluetoothState.STATE_CONNECTED) {
+                            System.arraycopy(fftLChInputs, 0, fft_LCh, 0, fftLChInputs.length);
+                            fft_LCh1D.realForwardFull(fft_LCh);
 
-                        // ArrayList<Double>을 double 형태로 변환하여 저장
-                        fftLChInputs = ArrayUtils.toPrimitive(tmpSensorData.toArray(new Double[tmpSensorData.size()]));
+                            double realValue_l, imgValue_l, psValue_l;
+                            double[] delta = new double[(int)((4 - 0.2) * 5)];      // (int) ((3.99-0.21)/PS_HZ)
+                            double[] theta = new double[(8 - 4) * 5];
+                            double[] alpha = new double[(13 - 8) * 5];
+                            double[] beta = new double[(30 - 13) * 5];
+                            int delta_cnt = 0, theta_cnt = 0, alpha_cnt = 0, beta_cnt = 0;
 
-                        DoubleFFT_1D fft_LCh1D = new DoubleFFT_1D(fftLChInputs.length);
-                        double[] fft_LCh = new double[fftLChInputs.length * 2];
+                            for (int i = 0; i < fft_LCh.length - 1; i += 2) {
+                                realValue_l = fft_LCh[i];
+                                imgValue_l = fft_LCh[i + 1];
 
-                        System.arraycopy(fftLChInputs, 0, fft_LCh, 0, fftLChInputs.length);
-                        fft_LCh1D.realForwardFull(fft_LCh);
+                                psValue_l = Math.sqrt(Math.pow(realValue_l, 2) + Math.pow(imgValue_l, 2));
 
-                        double realValue_l, imgValue_l, psValue_l;
-                        double [] delta = new double[(int)((3.99-0.21)*60) + 10];      // (int) ((3.99-0.21)/PS_HZ)
-                        double [] theta = new double[(int)((7.99-3.99)*60) + 10];
-                        double [] alpha = new double[(int)((12.99-7.99)*60) + 10];
-                        double [] beta = new double[(int)((30-12.99)*60) + 10];
-                        int delta_cnt = 0, theta_cnt = 0, alpha_cnt = 0, beta_cnt = 0;
-
-                        for (int i = 2; i < fft_LCh.length - 1; i += 2) {
-                            realValue_l = fft_LCh[i];
-                            imgValue_l = fft_LCh[i + 1];
-
-                            psValue_l = Math.sqrt(Math.pow(realValue_l, 2) + Math.pow(imgValue_l, 2));
-
-                            if (i >= (int)(0.21 / PS_HZ  * 2) && i < (int)(3.99 / PS_HZ * 2) ) {		    // Delta 영역: 0.21Hz ~ 3.99Hz
-                                delta[delta_cnt++] = psValue_l;
-                            } else if (i >= (int)(3.99 / PS_HZ * 2) && i < (int)(7.99 / PS_HZ * 2)) {	    // Theta 영역: 3.99Hz ~ 7.99Hz
-                                theta[theta_cnt++] = psValue_l;
-                            } else if (i >= (int)(7.99 / PS_HZ * 2) && i < (int)(12.99 / PS_HZ * 2)) {      // Alpha 영역: 7.99Hz ~ 12.99Hz
-                                alpha[alpha_cnt++] = psValue_l;
-                            } else if (i >= (int)(12.99 / PS_HZ * 2) && i < (int)(30 / PS_HZ * 2)) {		// Beta 영역: 12.99Hz ~ 30Hz
-                                beta[beta_cnt++] = psValue_l;
+                                if (i >= (int) ((0.2 / PS_HZ) * 2) && i < (int) ((4 / PS_HZ) * 2)) {            // Delta 영역: 0.21Hz ~ 3.99Hz
+                                    delta[delta_cnt++] = psValue_l;
+                                } else if (i >= (int) ((4 / PS_HZ) * 2) && i < (int) ((8 / PS_HZ) * 2)) {        // Theta 영역: 3.99Hz ~ 7.99Hz
+                                    theta[theta_cnt++] = psValue_l;
+                                } else if (i >= (int) ((8 / PS_HZ) * 2) && i < (int) ((13 / PS_HZ) * 2)) {      // Alpha 영역: 7.99Hz ~ 12.99Hz
+                                    alpha[alpha_cnt++] = psValue_l;
+                                } else if (i >= (int) ((13 / PS_HZ) * 2) && i < (int) ((30 / PS_HZ) * 2)) {        // Beta 영역: 12.99Hz ~ 30Hz
+                                    beta[beta_cnt++] = psValue_l;
+                                }
                             }
+
+                            result = calcMetrics(delta, theta, alpha, beta);
+
+                        } catch (NullPointerException ne) {
+                            result = null;
                         }
 
-                        double[] result = calcMetrics(delta, theta, alpha, beta);
-                        // Log.d("Power Spectrum result", "delta=" + result[0] + ", theta=" + result[2] + ", alpha=" + result[4] + ", beta=" + result[6]);
-
-                        //msg = Message.obtain();
-                        msg = mHandler.obtainMessage();
+                        Message msg = Message.obtain();
                         msg.what = 2;
                         msg.arg1 = secCount;
                         msg.obj = result;
@@ -676,6 +718,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
 
     public static double [] calcMetrics(double [] delta, double [] theta, double [] alpha, double [] beta) {
 
+        // PS 평균값 구하기
         double delta_mean = getMean(delta);
         double theta_mean = getMean(theta);
         double alpha_mean = getMean(alpha);
@@ -706,7 +749,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             totalSum += array[i];
         }
 
-        return totalSum/array.length;
+        return totalSum/original_length;
     }
 
     public static double getStd(double [] array, double mean) {
@@ -725,7 +768,7 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
             }
         }
 
-        sd = Math.sqrt(sum / array.length);
+        sd = Math.sqrt(sum / original_length);
 
         return sd;
     }
@@ -764,6 +807,14 @@ public class NeuroFeedbackActivity extends Activity implements OnClickListener {
         double[] target = new double[doubles.size()];
         for (int i = 0 ; i < target.length ; i++)
             target[i] = doubles.get(i);
+
+        return target;
+    }
+
+    public float[] toFloatPrimitive(ArrayList<Float> floats) {
+        float[] target = new float[floats.size()];
+        for (int i = 0 ; i < target.length ; i++)
+            target[i] = floats.get(i);
 
         return target;
     }
